@@ -55,7 +55,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     
     const RACK_HALF_WIDTH = 225.0;
     const RACK_UNIT_HEIGHT = 44.45;
-    const DEVICE_HEIGHT_PER_U = 25.0;  // Tighter fit for wide mode (25mm vs 35mm standard)
+    const DEVICE_HEIGHT_PER_U = 30.0;  // Allows 29mm devices to fit in 1U with room for flanges
     const EAR_WIDTH = 15.875;
     const FULL_RACK_WIDTH = RACK_HALF_WIDTH * 2;  // 450mm
     
@@ -316,7 +316,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     
     // Bottom flange (below opening, at bottom of faceplate)
     const bottomFlangeHeight = openingY;
-    if (bottomFlangeHeight > 5) {
+    if (bottomFlangeHeight > 3) {
         // Calculate hole Y positions
         let bottomHoleYPositions = [];
         if (bottomFlangeHeight >= 6) {
@@ -352,7 +352,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     
     // Top flange (above opening, at top of faceplate)
     const topFlangeHeight = faceplateHeight - openingY - openingHeight;
-    if (topFlangeHeight > 5) {
+    if (topFlangeHeight > 3) {
         // Calculate hole Y positions (relative to flange, not faceplate)
         let topHoleYPositions = [];
         if (topFlangeHeight >= 6) {
@@ -401,7 +401,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     };
     
     // Bottom corner gusset (only if there's room)
-    if (bottomGussetHeight > 5) {
+    if (bottomGussetHeight > 3) {
         // Create gusset shape - direction depends on bracket side
         const bottomGussetShape = new THREE.Shape();
         if (bracketSide === 'left') {
@@ -433,7 +433,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     }
     
     // Top corner gusset (only if there's room)
-    if (topGussetHeight > 5) {
+    if (topGussetHeight > 3) {
         const topGussetShape = new THREE.Shape();
         if (bracketSide === 'left') {
             topGussetShape.moveTo(0, 0);
