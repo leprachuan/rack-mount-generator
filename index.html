@@ -334,9 +334,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="wallThickness">Wall Thickness (mm)</label>
-                    <input type="number" id="wallThickness" value="3" min="1.5" max="10" step="0.5" required>
-                    <div class="input-label">Thickness of mounting bracket walls</div>
+                    <label for="wallThickness">Faceplate Thickness (mm)</label>
+                    <input type="number" id="wallThickness" value="10" min="3" max="20" step="1" required>
+                    <div class="input-label">Thickness of the front mounting plate</div>
                 </div>
 
                 <!-- Printer Settings -->
@@ -450,7 +450,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
         // THREE.JS Scene Setup
         let scene, camera, renderer, controls, mountMesh, supportMesh;
@@ -495,61 +495,89 @@
         }
 
         // Generate Mount Bracket Geometry
+        // This creates a preview that matches the STL generator output
         function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport) {
             const group = new THREE.Group();
-
-            // Main bracket - L-shaped piece
-            const bracketGeom = new THREE.BoxGeometry(
-                width + 2 * (tolerance + wallThickness),
-                height + 2 * (tolerance + wallThickness),
-                wallThickness
-            );
+            
+            // Constants matching STL generator
+            const RACK_HALF_WIDTH = 225.0;  // Half of 19" rack inside width
+            const RACK_UNIT_HEIGHT = 44.45; // 1U in mm
+            const DEVICE_HEIGHT_PER_U = 35.0; // Max device height per rack unit (leaves room for tolerance)
+            
+            // Calculate dimensions
+            const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+            const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
+            const faceplateWidth = RACK_HALF_WIDTH;
+            const faceplateThickness = wallThickness; // This is now the plate thickness (default 10mm)
+            
+            // Opening dimensions (with tolerance)
+            const openingWidth = width + 2 * tolerance;
+            const openingHeight = height + 2 * tolerance;
+            
+            // Center the opening
+            const openingX = (faceplateWidth - openingWidth) / 2;
+            const openingY = (faceplateHeight - openingHeight) / 2;
+            
+            // Material for the bracket
             const bracketMat = new THREE.MeshPhongMaterial({ color: 0x667eea });
-            const bracket = new THREE.Mesh(bracketGeom, bracketMat);
-            bracket.position.z = -wallThickness / 2;
-            group.add(bracket);
-
-            // Back support plate
-            const backPlateGeom = new THREE.BoxGeometry(
-                width + 2 * (tolerance + wallThickness),
-                height + 2 * (tolerance + wallThickness),
-                wallThickness / 2
-            );
-            const backPlate = new THREE.Mesh(backPlateGeom, bracketMat);
-            backPlate.position.z = -(wallThickness + 30);
-            group.add(backPlate);
-
-            // Side support rails
-            const railGeom = new THREE.BoxGeometry(wallThickness, height + 2 * (tolerance + wallThickness), 30);
-            const leftRail = new THREE.Mesh(railGeom, bracketMat);
-            leftRail.position.x = -(width / 2 + tolerance + wallThickness / 2);
-            leftRail.position.z = -(wallThickness / 2 + 15);
-            group.add(leftRail);
-
-            const rightRail = new THREE.Mesh(railGeom, bracketMat);
-            rightRail.position.x = (width / 2 + tolerance + wallThickness / 2);
-            rightRail.position.z = -(wallThickness / 2 + 15);
-            group.add(rightRail);
-
-            // Support posts if enabled
-            if (addSupport) {
-                const postGeom = new THREE.BoxGeometry(wallThickness, wallThickness, 20);
-                const postMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
-                
-                const positions = [
-                    [-width / 4, -height / 4, 0],
-                    [width / 4, -height / 4, 0],
-                    [-width / 4, height / 4, 0],
-                    [width / 4, height / 4, 0]
-                ];
-                
-                positions.forEach(pos => {
-                    const post = new THREE.Mesh(postGeom, postMat);
-                    post.position.set(pos[0], pos[1], -(wallThickness / 2 + 10));
-                    group.add(post);
-                });
+            const shelfMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
+            
+            // Create faceplate with hole using CSG-like approach with BoxGeometry pieces
+            // Since Three.js doesn't have native CSG, we'll build it from pieces
+            
+            // Bottom section (below opening)
+            if (openingY > 0) {
+                const bottomGeom = new THREE.BoxGeometry(faceplateWidth, openingY, faceplateThickness);
+                const bottomMesh = new THREE.Mesh(bottomGeom, bracketMat);
+                bottomMesh.position.set(faceplateWidth/2, openingY/2, -faceplateThickness/2);
+                group.add(bottomMesh);
             }
-
+            
+            // Top section (above opening)
+            const topHeight = faceplateHeight - openingY - openingHeight;
+            if (topHeight > 0) {
+                const topGeom = new THREE.BoxGeometry(faceplateWidth, topHeight, faceplateThickness);
+                const topMesh = new THREE.Mesh(topGeom, bracketMat);
+                topMesh.position.set(faceplateWidth/2, openingY + openingHeight + topHeight/2, -faceplateThickness/2);
+                group.add(topMesh);
+            }
+            
+            // Left section (beside opening)
+            if (openingX > 0) {
+                const leftGeom = new THREE.BoxGeometry(openingX, openingHeight, faceplateThickness);
+                const leftMesh = new THREE.Mesh(leftGeom, bracketMat);
+                leftMesh.position.set(openingX/2, openingY + openingHeight/2, -faceplateThickness/2);
+                group.add(leftMesh);
+            }
+            
+            // Right section (beside opening)
+            const rightWidth = faceplateWidth - openingX - openingWidth;
+            if (rightWidth > 0) {
+                const rightGeom = new THREE.BoxGeometry(rightWidth, openingHeight, faceplateThickness);
+                const rightMesh = new THREE.Mesh(rightGeom, bracketMat);
+                rightMesh.position.set(openingX + openingWidth + rightWidth/2, openingY + openingHeight/2, -faceplateThickness/2);
+                group.add(rightMesh);
+            }
+            
+            // Support shelf (extends back from bottom of opening)
+            if (addSupport) {
+                const shelfThickness = 5; // mm
+                const shelfDepth = depth + 10; // Extends 10mm past device
+                
+                const shelfGeom = new THREE.BoxGeometry(openingWidth, shelfThickness, shelfDepth);
+                const shelfMesh = new THREE.Mesh(shelfGeom, shelfMat);
+                // Position: centered under opening, extending back
+                shelfMesh.position.set(
+                    openingX + openingWidth/2,
+                    openingY - shelfThickness/2,
+                    -faceplateThickness - shelfDepth/2
+                );
+                group.add(shelfMesh);
+            }
+            
+            // Center the group
+            group.position.set(-faceplateWidth/2, -faceplateHeight/2, 0);
+            
             return group;
         }
 
@@ -575,16 +603,32 @@
             if (oldDevice) scene.remove(oldDevice);
 
             // Add device representation (semi-transparent)
+            // Position device inside the opening, resting on the shelf
+            const RACK_HALF_WIDTH = 225.0;
+            const RACK_UNIT_HEIGHT = 44.45;
+            const DEVICE_HEIGHT_PER_U = 35.0;
+            const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+            const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
+            const openingWidth = width + 2 * tolerance;
+            const openingHeight = height + 2 * tolerance;
+            const openingX = (RACK_HALF_WIDTH - openingWidth) / 2;
+            const openingY = (faceplateHeight - openingHeight) / 2;
+            
             const deviceGeometry = new THREE.BoxGeometry(width, height, depth);
             const deviceMaterial = new THREE.MeshPhongMaterial({
                 color: 0xff6b6b,
                 transparent: true,
-                opacity: 0.25,
+                opacity: 0.4,
                 wireframe: false
             });
             const deviceMesh = new THREE.Mesh(deviceGeometry, deviceMaterial);
             deviceMesh.name = 'deviceMesh';
-            deviceMesh.position.z = -(wallThickness + tolerance + depth / 2);
+            // Position device centered in opening, extending back from faceplate
+            deviceMesh.position.set(
+                openingX + openingWidth/2 - RACK_HALF_WIDTH/2,
+                openingY + tolerance + height/2 - faceplateHeight/2,
+                -(wallThickness + depth/2)
+            );
             scene.add(deviceMesh);
 
             // Calculate stats
@@ -592,23 +636,39 @@
         }
 
         function calculateStats(width, height, depth, tolerance, wallThickness) {
-            // Approximate volume calculation
-            const outerW = width + 2 * (tolerance + wallThickness);
-            const outerH = height + 2 * (tolerance + wallThickness);
-            const outerVolume = outerW * outerH * wallThickness;
-            const innerVolume = width * height * wallThickness;
-            const materialVolume = (outerVolume - innerVolume) / 1000; // cm³
+            // Constants
+            const RACK_HALF_WIDTH = 225.0;
+            const RACK_UNIT_HEIGHT = 44.45;
+            const DEVICE_HEIGHT_PER_U = 35.0;
+            const SHELF_THICKNESS = 5;
+            
+            // Calculate dimensions
+            const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+            const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
+            const openingWidth = width + 2 * tolerance;
+            const openingHeight = height + 2 * tolerance;
+            
+            // Faceplate volume (solid minus opening)
+            const faceplateVolume = (RACK_HALF_WIDTH * faceplateHeight * wallThickness) - 
+                                    (openingWidth * openingHeight * wallThickness);
+            
+            // Shelf volume
+            const shelfDepth = depth + 10;
+            const shelfVolume = openingWidth * SHELF_THICKNESS * shelfDepth;
+            
+            // Total volume in cm³
+            const totalVolume = (faceplateVolume + shelfVolume) / 1000;
 
             const infill = parseInt(document.getElementById('infill').value) / 100;
-            const estimatedVolume = materialVolume * infill;
+            const estimatedVolume = totalVolume * infill;
             const estimatedWeight = estimatedVolume * 1.24; // PLA density
 
-            document.getElementById('volumeValue').textContent = estimatedVolume.toFixed(1);
+            document.getElementById('volumeValue').textContent = totalVolume.toFixed(1);
             document.getElementById('weightValue').textContent = estimatedWeight.toFixed(1);
-            document.getElementById('partsValue').textContent = '3';
+            document.getElementById('partsValue').textContent = '1';
 
-            // Rough estimate: 0.5 hours per 5cm³ at 20% infill
-            const printHours = (estimatedVolume / 5) * 0.5;
+            // Rough estimate: 0.5 hours per 10cm³ at 20% infill
+            const printHours = (estimatedVolume / 10) * 0.5;
             document.getElementById('timeValue').textContent = printHours.toFixed(1) + 'h';
         }
 
@@ -728,7 +788,7 @@
             document.getElementById('deviceHeight').value = '44';
             document.getElementById('deviceDepth').value = '200';
             document.getElementById('tolerance').value = '2';
-            document.getElementById('wallThickness').value = '3';
+            document.getElementById('wallThickness').value = '10';
             document.getElementById('infill').value = '20';
             document.getElementById('filesContainer').style.display = 'none';
             document.getElementById('statusMessage').innerHTML = '';

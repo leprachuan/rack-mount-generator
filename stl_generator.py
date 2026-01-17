@@ -4,7 +4,7 @@
 Generates 3D-printable mounting bracket for square devices in 19" racks
 - Half-width faceplate (fits printer bed)
 - Rectangular hole through faceplate for device
-- Support lip below opening
+- Support shelf below opening that extends the device depth
 - Standard M6 mounting holes for rack attachment
 """
 
@@ -19,33 +19,35 @@ class RackMountGenerator:
     """Generate STL files for 19-inch rack mounting brackets"""
 
     # 19" Rack dimensions (in mm)
-    RACK_FULL_WIDTH = 483  # Full 19 inches
-    RACK_HALF_WIDTH = 241.5  # Half width (fits printer bed)
+    RACK_FULL_WIDTH = 450.0  # Inside width of standard 19" rack (~17.75 inches)
+    RACK_HALF_WIDTH = 225.0  # Half width (fits printer bed)
     RACK_UNIT_HEIGHT = 44.45  # 1U in mm
-    HOLE_PITCH = 10.16  # Distance between mounting holes (0.4")
+    HOLE_PITCH = 15.875  # Standard hole spacing (5/8")
     HOLE_DIAMETER = 6.35  # M6 clearance hole (0.25")
-    HOLE_FROM_EDGE_X = 25.4  # Distance from left/right edge (1")
-    HOLE_FROM_EDGE_Y = 6.35  # Distance from top/bottom edge
+    HOLE_FROM_EDGE_X = 6.35  # Distance from left/right edge to hole center
 
     def __init__(self,
                  device_width: float,
                  device_height: float,
                  device_depth: float,
                  tolerance: float = 2.0,
-                 wall_thickness: float = 3.0,
+                 wall_thickness: float = 10.0,  # Faceplate thickness (default 10mm)
                  add_support: bool = True,
-                 add_rack_holes: bool = True):
+                 add_rack_holes: bool = True,
+                 shelf_thickness: float = 5.0):  # Support shelf thickness
         """Initialize the mount generator"""
         self.device_width = device_width
         self.device_height = device_height
         self.device_depth = device_depth
         self.tolerance = tolerance
-        self.wall_thickness = wall_thickness
+        self.wall_thickness = wall_thickness  # Faceplate thickness
         self.add_support = add_support
         self.add_rack_holes = add_rack_holes
+        self.shelf_thickness = shelf_thickness
 
         # Calculate rack units needed (round up)
-        self.rack_units = math.ceil(device_height / self.RACK_UNIT_HEIGHT)
+        # Use 35mm threshold per rack unit to leave room for tolerance
+        self.rack_units = math.ceil(device_height / 35.0)
         self.faceplate_height = self.rack_units * self.RACK_UNIT_HEIGHT
 
         # Use half-width for printability
@@ -55,189 +57,244 @@ class RackMountGenerator:
         self.opening_width = device_width + 2 * tolerance
         self.opening_height = device_height + 2 * tolerance
 
-        # Center the opening on the faceplate
+        # Center the opening horizontally, and vertically within the rack units
         self.opening_x = (self.faceplate_width - self.opening_width) / 2
         self.opening_y = (self.faceplate_height - self.opening_height) / 2
 
-        # Support lip dimensions
-        self.lip_thickness = wall_thickness
-        self.lip_depth = device_depth + 10  # Extends 10mm past device depth
-
-    def create_box_hole(self, triangles: List, x: float, y: float, z: float, 
-                       width: float, height: float, depth: float):
-        """Create a rectangular hole through a solid by defining its edges"""
-        # Front opening (at z=0)
-        # Top edge
-        triangles.append([[x, y + height, z], [x + width, y + height, z], [x + width, y + height, -depth]])
-        triangles.append([[x, y + height, z], [x + width, y + height, -depth], [x, y + height, -depth]])
-        
-        # Bottom edge
-        triangles.append([[x, y, z], [x, y, -depth], [x + width, y, -depth]])
-        triangles.append([[x, y, z], [x + width, y, -depth], [x + width, y, z]])
-        
-        # Left edge
-        triangles.append([[x, y, z], [x, y + height, z], [x, y + height, -depth]])
-        triangles.append([[x, y, z], [x, y + height, -depth], [x, y, -depth]])
-        
-        # Right edge
-        triangles.append([[x + width, y, z], [x + width, y, -depth], [x + width, y + height, -depth]])
-        triangles.append([[x + width, y, z], [x + width, y + height, -depth], [x + width, y + height, z]])
+        # Support shelf extends back the full depth of the device
+        self.shelf_depth = device_depth + 10  # Extends 10mm past device depth for support
 
     def add_quad(self, triangles: List, v0, v1, v2, v3):
-        """Add a quad as two triangles"""
+        """Add a quad as two triangles (counter-clockwise winding for outward normals)"""
         triangles.append([v0, v1, v2])
         triangles.append([v0, v2, v3])
 
     def create_faceplate_with_hole(self) -> List[List[List[float]]]:
-        """Create faceplate with device hole and support lip"""
+        """
+        Create faceplate with device cutout hole and support shelf.
+        
+        Coordinate system:
+        - X: width (left to right)
+        - Y: height (bottom to top)  
+        - Z: depth (front to back, negative goes into rack)
+        """
         triangles = []
 
         # Faceplate dimensions
         fp_w = self.faceplate_width
         fp_h = self.faceplate_height
-        fp_thickness = self.wall_thickness
+        fp_t = self.wall_thickness  # Faceplate thickness
 
-        # Opening dimensions
-        open_x = self.opening_x
-        open_y = self.opening_y
-        open_w = self.opening_width
-        open_h = self.opening_height
+        # Opening dimensions and position
+        op_x = self.opening_x  # Left edge of opening
+        op_y = self.opening_y  # Bottom edge of opening
+        op_w = self.opening_width
+        op_h = self.opening_height
+        op_x2 = op_x + op_w  # Right edge of opening
+        op_y2 = op_y + op_h  # Top edge of opening
 
-        # Lip dimensions
-        lip_y_bottom = open_y + open_h  # Bottom of opening
-        lip_thickness = self.lip_thickness
-        lip_depth = self.lip_depth
+        # ============================================
+        # FRONT FACE of faceplate (Z = 0)
+        # We need to draw the front face with a rectangular hole
+        # ============================================
+        
+        # Bottom strip (below opening)
+        if op_y > 0:
+            self.add_quad(triangles,
+                [0, 0, 0], [fp_w, 0, 0], [fp_w, op_y, 0], [0, op_y, 0])
+        
+        # Top strip (above opening)
+        if op_y2 < fp_h:
+            self.add_quad(triangles,
+                [0, op_y2, 0], [fp_w, op_y2, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
+        
+        # Left strip (beside opening, between bottom and top strips)
+        if op_x > 0:
+            self.add_quad(triangles,
+                [0, op_y, 0], [op_x, op_y, 0], [op_x, op_y2, 0], [0, op_y2, 0])
+        
+        # Right strip (beside opening, between bottom and top strips)
+        if op_x2 < fp_w:
+            self.add_quad(triangles,
+                [op_x2, op_y, 0], [fp_w, op_y, 0], [fp_w, op_y2, 0], [op_x2, op_y2, 0])
 
-        # === FACEPLATE FRONT FACE (with rectangular hole) ===
-        # Top section (above opening)
-        if open_y > 0:
-            self.add_quad(triangles, [0, open_y, 0], [fp_w, open_y, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
+        # ============================================
+        # BACK FACE of faceplate (Z = -fp_t)
+        # Same layout but with hole, and reversed winding
+        # ============================================
+        
+        # Bottom strip
+        if op_y > 0:
+            self.add_quad(triangles,
+                [0, 0, -fp_t], [0, op_y, -fp_t], [fp_w, op_y, -fp_t], [fp_w, 0, -fp_t])
+        
+        # Top strip
+        if op_y2 < fp_h:
+            self.add_quad(triangles,
+                [0, op_y2, -fp_t], [0, fp_h, -fp_t], [fp_w, fp_h, -fp_t], [fp_w, op_y2, -fp_t])
+        
+        # Left strip
+        if op_x > 0:
+            self.add_quad(triangles,
+                [0, op_y, -fp_t], [0, op_y2, -fp_t], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
+        
+        # Right strip
+        if op_x2 < fp_w:
+            self.add_quad(triangles,
+                [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [fp_w, op_y2, -fp_t], [fp_w, op_y, -fp_t])
 
-        # Left section (left of opening)
-        if open_x > 0:
-            self.add_quad(triangles, [0, open_y, 0], [open_x, open_y, 0], [open_x, lip_y_bottom, 0], [0, lip_y_bottom, 0])
+        # ============================================
+        # HOLE INNER WALLS (connecting front to back through the cutout)
+        # ============================================
+        
+        # Top inner wall of hole
+        self.add_quad(triangles,
+            [op_x, op_y2, 0], [op_x2, op_y2, 0], [op_x2, op_y2, -fp_t], [op_x, op_y2, -fp_t])
+        
+        # Bottom inner wall of hole
+        self.add_quad(triangles,
+            [op_x, op_y, 0], [op_x, op_y, -fp_t], [op_x2, op_y, -fp_t], [op_x2, op_y, 0])
+        
+        # Left inner wall of hole
+        self.add_quad(triangles,
+            [op_x, op_y, 0], [op_x, op_y2, 0], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
+        
+        # Right inner wall of hole
+        self.add_quad(triangles,
+            [op_x2, op_y, 0], [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [op_x2, op_y2, 0])
 
-        # Right section (right of opening)
-        if open_x + open_w < fp_w:
-            self.add_quad(triangles, [open_x + open_w, open_y, 0], [fp_w, open_y, 0], [fp_w, lip_y_bottom, 0], [open_x + open_w, lip_y_bottom, 0])
-
-        # Bottom section (below lip)
-        if lip_y_bottom + lip_thickness < fp_h:
-            self.add_quad(triangles, [0, lip_y_bottom + lip_thickness, 0], [fp_w, lip_y_bottom + lip_thickness, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
-
-        # === RECTANGULAR HOLE EDGES (through faceplate) ===
-        self.create_box_hole(triangles, open_x, open_y, 0, open_w, open_h, fp_thickness)
-
-        # === SUPPORT LIP ===
-        # Top surface of lip (what device rests on)
-        self.add_quad(triangles, [open_x, lip_y_bottom, 0], [open_x + open_w, lip_y_bottom, 0], 
-                      [open_x + open_w, lip_y_bottom, -lip_depth], [open_x, lip_y_bottom, -lip_depth])
-
-        # Front face of lip (inner walls)
-        # Left inner wall
-        self.add_quad(triangles, [open_x, open_y + open_h, 0], [open_x, open_y + open_h, -fp_thickness],
-                      [open_x, lip_y_bottom - lip_thickness, -fp_thickness], [open_x, lip_y_bottom - lip_thickness, 0])
-
-        # Right inner wall
-        self.add_quad(triangles, [open_x + open_w, open_y + open_h, 0], [open_x + open_w, lip_y_bottom - lip_thickness, 0],
-                      [open_x + open_w, lip_y_bottom - lip_thickness, -fp_thickness], [open_x + open_w, open_y + open_h, -fp_thickness])
-
-        # Left side of lip
-        self.add_quad(triangles, [open_x, lip_y_bottom, 0], [open_x, lip_y_bottom - lip_thickness, 0],
-                      [open_x, lip_y_bottom - lip_thickness, -lip_depth], [open_x, lip_y_bottom, -lip_depth])
-
-        # Right side of lip
-        self.add_quad(triangles, [open_x + open_w, lip_y_bottom, 0], [open_x + open_w, lip_y_bottom, -lip_depth],
-                      [open_x + open_w, lip_y_bottom - lip_thickness, -lip_depth], [open_x + open_w, lip_y_bottom - lip_thickness, 0])
-
-        # Bottom of lip (back face)
-        self.add_quad(triangles, [open_x, lip_y_bottom - lip_thickness, -lip_depth], 
-                      [open_x + open_w, lip_y_bottom - lip_thickness, -lip_depth],
-                      [open_x + open_w, lip_y_bottom, -lip_depth], [open_x, lip_y_bottom, -lip_depth])
-
-        # === FACEPLATE BACK FACE ===
-        self.add_quad(triangles, [0, 0, -fp_thickness], [fp_w, 0, -fp_thickness], 
-                      [fp_w, fp_h, -fp_thickness], [0, fp_h, -fp_thickness])
-
-        # === FACEPLATE EDGE FACES ===
+        # ============================================
+        # OUTER EDGES of faceplate
+        # ============================================
+        
         # Top edge
-        self.add_quad(triangles, [0, fp_h, 0], [fp_w, fp_h, 0], [fp_w, fp_h, -fp_thickness], [0, fp_h, -fp_thickness])
-
+        self.add_quad(triangles,
+            [0, fp_h, 0], [fp_w, fp_h, 0], [fp_w, fp_h, -fp_t], [0, fp_h, -fp_t])
+        
         # Bottom edge
-        self.add_quad(triangles, [0, 0, 0], [0, 0, -fp_thickness], [fp_w, 0, -fp_thickness], [fp_w, 0, 0])
-
+        self.add_quad(triangles,
+            [0, 0, 0], [0, 0, -fp_t], [fp_w, 0, -fp_t], [fp_w, 0, 0])
+        
         # Left edge
-        self.add_quad(triangles, [0, 0, 0], [0, fp_h, 0], [0, fp_h, -fp_thickness], [0, 0, -fp_thickness])
-
+        self.add_quad(triangles,
+            [0, 0, 0], [0, fp_h, 0], [0, fp_h, -fp_t], [0, 0, -fp_t])
+        
         # Right edge
-        self.add_quad(triangles, [fp_w, 0, 0], [fp_w, 0, -fp_thickness], [fp_w, fp_h, -fp_thickness], [fp_w, fp_h, 0])
+        self.add_quad(triangles,
+            [fp_w, 0, 0], [fp_w, 0, -fp_t], [fp_w, fp_h, -fp_t], [fp_w, fp_h, 0])
 
-        # === MOUNTING HOLES (if enabled) ===
+        # ============================================
+        # SUPPORT SHELF (extends back from bottom of opening)
+        # The shelf sits at the bottom of the opening and extends back
+        # ============================================
+        
+        if self.add_support:
+            shelf_t = self.shelf_thickness
+            shelf_d = self.shelf_depth
+            
+            # Shelf is positioned at the bottom of the opening
+            # It starts at Z = -fp_t (back of faceplate) and extends to Z = -(fp_t + shelf_d)
+            shelf_z_front = -fp_t
+            shelf_z_back = -fp_t - shelf_d
+            
+            # Shelf width matches opening width
+            shelf_x1 = op_x
+            shelf_x2 = op_x2
+            
+            # Shelf Y position (sits at bottom of opening)
+            shelf_y_top = op_y
+            shelf_y_bottom = op_y - shelf_t
+            
+            # Top face of shelf (device rests here)
+            self.add_quad(triangles,
+                [shelf_x1, shelf_y_top, shelf_z_front],
+                [shelf_x2, shelf_y_top, shelf_z_front],
+                [shelf_x2, shelf_y_top, shelf_z_back],
+                [shelf_x1, shelf_y_top, shelf_z_back])
+            
+            # Bottom face of shelf
+            self.add_quad(triangles,
+                [shelf_x1, shelf_y_bottom, shelf_z_front],
+                [shelf_x1, shelf_y_bottom, shelf_z_back],
+                [shelf_x2, shelf_y_bottom, shelf_z_back],
+                [shelf_x2, shelf_y_bottom, shelf_z_front])
+            
+            # Left side of shelf
+            self.add_quad(triangles,
+                [shelf_x1, shelf_y_bottom, shelf_z_front],
+                [shelf_x1, shelf_y_top, shelf_z_front],
+                [shelf_x1, shelf_y_top, shelf_z_back],
+                [shelf_x1, shelf_y_bottom, shelf_z_back])
+            
+            # Right side of shelf
+            self.add_quad(triangles,
+                [shelf_x2, shelf_y_bottom, shelf_z_front],
+                [shelf_x2, shelf_y_bottom, shelf_z_back],
+                [shelf_x2, shelf_y_top, shelf_z_back],
+                [shelf_x2, shelf_y_top, shelf_z_front])
+            
+            # Back face of shelf
+            self.add_quad(triangles,
+                [shelf_x1, shelf_y_bottom, shelf_z_back],
+                [shelf_x1, shelf_y_top, shelf_z_back],
+                [shelf_x2, shelf_y_top, shelf_z_back],
+                [shelf_x2, shelf_y_bottom, shelf_z_back])
+            
+            # Front face of shelf (connects to faceplate back)
+            # Only needed if shelf_y_bottom < 0 (shelf extends below faceplate)
+            # Actually, we need to connect shelf to faceplate
+            self.add_quad(triangles,
+                [shelf_x1, shelf_y_bottom, shelf_z_front],
+                [shelf_x2, shelf_y_bottom, shelf_z_front],
+                [shelf_x2, shelf_y_top, shelf_z_front],
+                [shelf_x1, shelf_y_top, shelf_z_front])
+
+        # ============================================
+        # MOUNTING HOLES (if enabled)
+        # ============================================
         if self.add_rack_holes:
             holes = self.calculate_mounting_holes()
             for hx, hy in holes:
-                hole_verts, hole_tris = self.create_vertices_cylinder(
-                    hx, hy, 0, self.HOLE_DIAMETER / 2, self.wall_thickness, segments=12
-                )
+                hole_tris = self.create_hole(hx, hy, self.HOLE_DIAMETER / 2, fp_t, segments=16)
                 triangles.extend(hole_tris)
 
         return triangles
 
-    def create_vertices_cylinder(self, cx: float, cy: float, cz: float, radius: float,
-                                height: float, segments: int = 12) -> Tuple[List, List]:
-        """Create vertices for a cylinder (hole)"""
-        vertices = []
+    def create_hole(self, cx: float, cy: float, radius: float, depth: float, segments: int = 16) -> List:
+        """Create a cylindrical hole through the faceplate"""
         triangles = []
-
-        # Top circle
+        
+        # Generate points around the circle
         for i in range(segments):
-            angle = 2 * math.pi * i / segments
-            x = cx + radius * math.cos(angle)
-            y = cy + radius * math.sin(angle)
-            vertices.append([x, y, cz])
-
-        # Bottom circle
-        for i in range(segments):
-            angle = 2 * math.pi * i / segments
-            x = cx + radius * math.cos(angle)
-            y = cy + radius * math.sin(angle)
-            vertices.append([x, y, cz - height])
-
-        # Side triangles
-        for i in range(segments):
-            next_i = (i + 1) % segments
-            triangles.append([vertices[i], vertices[next_i], vertices[segments + next_i]])
-            triangles.append([vertices[i], vertices[segments + next_i], vertices[segments + i]])
-
-        # Top cap
-        for i in range(segments - 2):
-            triangles.append([vertices[0], vertices[i + 1], vertices[i + 2]])
-
-        # Bottom cap
-        for i in range(segments - 2):
-            triangles.append([vertices[segments], vertices[segments + i + 2], vertices[segments + i + 1]])
-
-        return vertices, triangles
+            angle1 = 2 * math.pi * i / segments
+            angle2 = 2 * math.pi * ((i + 1) % segments) / segments
+            
+            x1 = cx + radius * math.cos(angle1)
+            y1 = cy + radius * math.sin(angle1)
+            x2 = cx + radius * math.cos(angle2)
+            y2 = cy + radius * math.sin(angle2)
+            
+            # Cylinder wall (connecting front to back)
+            triangles.append([[x1, y1, 0], [x2, y2, 0], [x2, y2, -depth]])
+            triangles.append([[x1, y1, 0], [x2, y2, -depth], [x1, y1, -depth]])
+        
+        return triangles
 
     def calculate_mounting_holes(self) -> List[Tuple[float, float]]:
-        """Calculate positions of standard 19" rack mounting holes (for half-width bracket)"""
+        """Calculate positions of standard 19" rack mounting holes"""
         holes = []
-
-        # For half-width bracket, we have columns on the edges
-        # Standard: 25.4mm from edge = 1"
-        x_positions = [self.HOLE_FROM_EDGE_X, self.faceplate_width - self.HOLE_FROM_EDGE_X]
-
-        # Calculate number of hole rows
-        num_rows = int(self.faceplate_height / self.HOLE_PITCH)
-
-        y_start = self.HOLE_FROM_EDGE_Y
-
-        for row in range(num_rows):
-            y = y_start + row * self.HOLE_PITCH
-            if y < self.faceplate_height - self.HOLE_FROM_EDGE_Y:
-                for x in x_positions:
-                    holes.append((x, y))
-
+        
+        # Standard rack holes are near the edges
+        x_pos = self.HOLE_FROM_EDGE_X
+        
+        # Vertical spacing: typically 3 holes per U with standard spacing
+        # We'll put holes at quarter points of each rack unit
+        for u in range(self.rack_units):
+            base_y = u * self.RACK_UNIT_HEIGHT
+            # Two holes per U, at 1/4 and 3/4 positions
+            holes.append((x_pos, base_y + self.RACK_UNIT_HEIGHT * 0.25))
+            holes.append((x_pos, base_y + self.RACK_UNIT_HEIGHT * 0.75))
+        
         return holes
 
     def generate_all_parts(self) -> Dict[str, List]:

@@ -288,6 +288,8 @@ def cleanup_old_jobs(max_age_hours=24):
 
 
 if __name__ == '__main__':
+    import sys
+    
     # Clean up old jobs on startup
     cleanup_old_jobs()
 
@@ -296,4 +298,18 @@ if __name__ == '__main__':
     print("📍 Open http://localhost:5000 in your browser")
     print("\nServer running on http://127.0.0.1:5000")
 
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    # Parse host and port from arguments
+    host = '127.0.0.1'
+    port = 5000
+    
+    if '--host' in sys.argv:
+        host_idx = sys.argv.index('--host')
+        if host_idx + 1 < len(sys.argv):
+            host = sys.argv[host_idx + 1]
+    
+    if '--port' in sys.argv:
+        port_idx = sys.argv.index('--port')
+        if port_idx + 1 < len(sys.argv):
+            port = int(sys.argv[port_idx + 1])
+
+    app.run(debug=True, host=host, port=port)
