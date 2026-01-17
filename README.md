@@ -4,6 +4,14 @@ A web-based tool for generating customized 3D-printable mounting brackets for de
 
 ![Preview](https://img.shields.io/badge/3D-Preview-blue) ![STL Export](https://img.shields.io/badge/Export-STL-green) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+## 🚀 Try It Now
+
+**Use the app directly in your browser (no installation required):**
+
+**https://leprachuan.github.io/rack-mount-generator/**
+
+The app runs entirely in your browser - all 3D rendering and STL export happens client-side!
+
 ## Features
 
 ✨ **Real-Time 3D Preview**
@@ -29,7 +37,9 @@ A web-based tool for generating customized 3D-printable mounting brackets for de
 - Binary STL format for efficiency
 - Direct browser download - no server processing
 
-## Quick Start
+## Local Development (Optional)
+
+Want to run the app locally or contribute? Follow these steps:
 
 ### Prerequisites
 - Python 3.11 or higher
