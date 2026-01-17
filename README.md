@@ -194,15 +194,26 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for development setup and contribution guid
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for technical architecture details.
 
-## AI Agent Instructions
+## Contributing
 
-See [AGENTS.md](AGENTS.md) for instructions on working with this codebase.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- How to report bugs
+- How to suggest features
+- Pull request process
+- Code style expectations
 
-See [CLAUDE.md](CLAUDE.md) for Claude-specific implementation details.
+For branch protection and release information, see [BRANCH_PROTECTION.md](BRANCH_PROTECTION.md).
+
+## Developer Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development setup and code structure
+- **[AGENTS.md](AGENTS.md)** - AI agent instructions for code generation
+- **[CLAUDE.md](CLAUDE.md)** - Claude AI specific implementation details
 
 ## License
 
-MIT License - See LICENSE file for details.
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
