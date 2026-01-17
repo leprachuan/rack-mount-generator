@@ -1193,36 +1193,6 @@ function resetForm() {
     updatePreview();
 }
 
-// Bed size presets
-const bedSizePresets = {
-    'prusa': { width: 250, depth: 210 },
-    'ender3': { width: 220, depth: 220 },
-    'anycubic_kobra': { width: 250, depth: 250 },
-    'cr10': { width: 300, depth: 300 },
-    'custom': { width: null, depth: null }
-};
-
-// Bed size handler
-document.getElementById('bedSize').addEventListener('change', (e) => {
-    const customGroup = document.getElementById('customBedGroup');
-    const bedWidth = document.getElementById('bedWidth');
-    const bedDepth = document.getElementById('bedDepth');
-    
-    if (e.target.value === 'custom') {
-        customGroup.style.display = 'block';
-        bedWidth.value = '';
-        bedDepth.value = '';
-        bedWidth.focus();
-    } else {
-        customGroup.style.display = 'none';
-        const preset = bedSizePresets[e.target.value];
-        if (preset) {
-            bedWidth.value = preset.width;
-            bedDepth.value = preset.depth;
-        }
-    }
-});
-
 // Input listeners for live preview
 ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'shelfThickness', 'flangeThickness', 'gussetSize', 'shelfGussetWidth', 'infill'].forEach(id => {
     document.getElementById(id).addEventListener('input', updatePreview);

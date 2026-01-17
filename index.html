@@ -372,34 +372,9 @@
                     <div class="input-label">Standard M6 holes for rack rail attachment</div>
                 </div>
 
-                <!-- Printer Settings -->
+                <!-- Print Settings -->
                 <div class="divider"></div>
-                <div class="section-title">Printer Configuration</div>
-
-                <div class="form-group">
-                    <label for="bedSize">Bed Size Preset</label>
-                    <select id="bedSize" required>
-                        <option value="prusa">Prusa i3 MK3S (250 × 210mm)</option>
-                        <option value="ender3">Ender 3 (220 × 220mm)</option>
-                        <option value="anycubic_kobra">Anycubic Kobra S1 (250 × 250mm)</option>
-                        <option value="cr10">CR-10 (300 × 300mm)</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="customBedGroup" style="display: none;">
-                    <label>Custom Bed Size (mm)</label>
-                    <div class="input-row">
-                        <div>
-                            <input type="number" id="bedWidth" placeholder="250" min="100" max="500" value="">
-                            <div class="input-label">Width</div>
-                        </div>
-                        <div>
-                            <input type="number" id="bedDepth" placeholder="210" min="100" max="500" value="">
-                            <div class="input-label">Depth</div>
-                        </div>
-                    </div>
-                </div>
+                <div class="section-title">Print Configuration</div>
 
                 <div class="form-group">
                     <label for="infill">Infill Density</label>
@@ -445,14 +420,6 @@
                         <label for="addSupport" style="margin-bottom: 0;">Include underside support posts</label>
                     </div>
                     <div class="input-label" style="margin-top: 8px;">Adds support underneath to prevent sagging</div>
-                </div>
-
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="addRackHoles">
-                        <label for="addRackHoles" style="margin-bottom: 0;">Add 19" rack mounting holes</label>
-                    </div>
-                    <div class="input-label" style="margin-top: 8px;">Standard square hole pattern for rack rails</div>
                 </div>
 
                 <!-- Action Buttons -->
