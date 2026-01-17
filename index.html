@@ -300,6 +300,10 @@
             <div class="info-box">
                 ℹ️ Enter your device dimensions (Width × Height × Depth) to generate customized STL files optimized for 3D printing.
             </div>
+            
+            <div id="wideModeIndicator" class="info-box" style="display: none; background: #fff3cd; border-color: #ffc107; color: #856404;">
+                ⚠️ <strong>Wide Device Mode:</strong> Device spans full rack width. Two brackets will be generated.
+            </div>
 
             <form id="mountForm">
                 <!-- Device Dimensions -->
@@ -542,11 +546,387 @@
             renderer.render(scene, camera);
         }
 
+        // Check if device requires full-width (two-bracket) mode
+        function isWideDeviceMode(width, tolerance) {
+            const RACK_HALF_WIDTH = 225.0;
+            const openingWidth = width + 2 * tolerance;
+            // If opening is wider than what fits in half-rack (leaving room for edges), use wide mode
+            // Allow some margin (20mm on each side minimum)
+            return openingWidth > (RACK_HALF_WIDTH - 40);
+        }
+
+        // Generate a single bracket for wide-device mode
+        // bracketSide: 'left' or 'right' determines which half we're generating
+        function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, bracketSide) {
+            const group = new THREE.Group();
+            
+            const RACK_HALF_WIDTH = 225.0;
+            const RACK_UNIT_HEIGHT = 44.45;
+            const DEVICE_HEIGHT_PER_U = 35.0;
+            const EAR_WIDTH = 15.875;
+            const FULL_RACK_WIDTH = RACK_HALF_WIDTH * 2;  // 450mm
+            
+            const isBlank = document.getElementById('isBlank').checked;
+            const addRackHoles = document.getElementById('addRackHoles').checked;
+            
+            // Calculate dimensions
+            const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+            const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
+            const faceplateWidth = RACK_HALF_WIDTH;
+            const faceplateThickness = wallThickness;
+            
+            // Device opening spans both brackets, centered in full rack
+            const openingWidth = width + 2 * tolerance;
+            const openingHeight = height + 2 * tolerance;
+            const openingY = (faceplateHeight - openingHeight) / 2;
+            
+            // Calculate where opening starts in full-width coordinate system
+            const fullOpeningX = (FULL_RACK_WIDTH - openingWidth) / 2;
+            
+            // Materials
+            const bracketMat = new THREE.MeshPhongMaterial({ color: 0x667eea });
+            const shelfMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
+            const earMat = new THREE.MeshPhongMaterial({ color: 0x4CAF50 });
+            const flangeMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 });
+            
+            // Calculate this bracket's portion of the opening
+            let localOpeningStart, localOpeningEnd;
+            if (bracketSide === 'left') {
+                // Left bracket covers X: 0 to RACK_HALF_WIDTH
+                localOpeningStart = Math.max(0, fullOpeningX);
+                localOpeningEnd = Math.min(RACK_HALF_WIDTH, fullOpeningX + openingWidth);
+            } else {
+                // Right bracket covers X: RACK_HALF_WIDTH to FULL_RACK_WIDTH
+                // Convert to local coordinates (0 to RACK_HALF_WIDTH)
+                localOpeningStart = Math.max(0, fullOpeningX - RACK_HALF_WIDTH);
+                localOpeningEnd = Math.min(RACK_HALF_WIDTH, fullOpeningX + openingWidth - RACK_HALF_WIDTH);
+            }
+            const localOpeningWidth = localOpeningEnd - localOpeningStart;
+            
+            // BLANK PANEL - solid faceplate
+            if (isBlank) {
+                const blankGeom = new THREE.BoxGeometry(faceplateWidth, faceplateHeight, faceplateThickness);
+                const blankMesh = new THREE.Mesh(blankGeom, bracketMat);
+                blankMesh.position.set(faceplateWidth/2, faceplateHeight/2, -faceplateThickness/2);
+                group.add(blankMesh);
+            } else {
+                // Create faceplate with partial opening
+                
+                // Bottom section (below opening)
+                if (openingY > 0) {
+                    const bottomGeom = new THREE.BoxGeometry(faceplateWidth, openingY, faceplateThickness);
+                    const bottomMesh = new THREE.Mesh(bottomGeom, bracketMat);
+                    bottomMesh.position.set(faceplateWidth/2, openingY/2, -faceplateThickness/2);
+                    group.add(bottomMesh);
+                }
+                
+                // Top section (above opening)
+                const topHeight = faceplateHeight - openingY - openingHeight;
+                if (topHeight > 0) {
+                    const topGeom = new THREE.BoxGeometry(faceplateWidth, topHeight, faceplateThickness);
+                    const topMesh = new THREE.Mesh(topGeom, bracketMat);
+                    topMesh.position.set(faceplateWidth/2, openingY + openingHeight + topHeight/2, -faceplateThickness/2);
+                    group.add(topMesh);
+                }
+                
+                // Left section (beside opening in local coords)
+                if (localOpeningStart > 0) {
+                    const leftGeom = new THREE.BoxGeometry(localOpeningStart, openingHeight, faceplateThickness);
+                    const leftMesh = new THREE.Mesh(leftGeom, bracketMat);
+                    leftMesh.position.set(localOpeningStart/2, openingY + openingHeight/2, -faceplateThickness/2);
+                    group.add(leftMesh);
+                }
+                
+                // Right section (beside opening in local coords)
+                const rightStart = localOpeningEnd;
+                const rightWidth = faceplateWidth - rightStart;
+                if (rightWidth > 0) {
+                    const rightGeom = new THREE.BoxGeometry(rightWidth, openingHeight, faceplateThickness);
+                    const rightMesh = new THREE.Mesh(rightGeom, bracketMat);
+                    rightMesh.position.set(rightStart + rightWidth/2, openingY + openingHeight/2, -faceplateThickness/2);
+                    group.add(rightMesh);
+                }
+            }
+            
+            // Support shelf - only on the side with opening, with OUTER gusset only
+            if (addSupport && !isBlank && localOpeningWidth > 0) {
+                const shelfDepth = depth + 10;
+                const gussetWidth = 15;
+                
+                // Shelf extends from the opening edge to the outer edge of bracket
+                let shelfStart, shelfWidth, hasOuterGusset;
+                
+                if (bracketSide === 'left') {
+                    // Left bracket: shelf goes from opening start to left edge
+                    // Outer gusset is on the LEFT side (towards rack ear)
+                    shelfStart = localOpeningStart - gussetWidth;
+                    shelfWidth = localOpeningWidth + gussetWidth;  // Only outer gusset
+                    hasOuterGusset = localOpeningStart > gussetWidth;  // Has room for outer gusset
+                } else {
+                    // Right bracket: shelf goes from opening end plus gusset
+                    // Outer gusset is on the RIGHT side (towards rack ear)
+                    shelfStart = localOpeningStart;
+                    shelfWidth = localOpeningWidth + gussetWidth;  // Only outer gusset
+                    hasOuterGusset = (faceplateWidth - localOpeningEnd) > gussetWidth;
+                }
+                
+                if (shelfWidth > 0) {
+                    const shelfGeom = new THREE.BoxGeometry(shelfWidth, shelfThickness, shelfDepth);
+                    const shelfMesh = new THREE.Mesh(shelfGeom, shelfMat);
+                    shelfMesh.position.set(
+                        shelfStart + shelfWidth/2,
+                        openingY - shelfThickness/2,
+                        -faceplateThickness - shelfDepth/2
+                    );
+                    group.add(shelfMesh);
+                    
+                    // Only add the OUTER gusset (towards the rack ear, away from center)
+                    if (hasOuterGusset) {
+                        const gussetHeight = height;
+                        const gussetShape = new THREE.Shape();
+                        gussetShape.moveTo(0, 0);
+                        gussetShape.lineTo(shelfDepth, 0);
+                        gussetShape.lineTo(0, gussetHeight);
+                        gussetShape.lineTo(0, 0);
+                        
+                        const extrudeSettings = {
+                            steps: 1,
+                            depth: gussetWidth,
+                            bevelEnabled: false
+                        };
+                        
+                        const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, extrudeSettings);
+                        const outerGusset = new THREE.Mesh(gussetGeom, shelfMat);
+                        outerGusset.rotation.y = Math.PI / 2;
+                        
+                        if (bracketSide === 'left') {
+                            // Outer gusset on left side of opening
+                            outerGusset.position.set(
+                                localOpeningStart - gussetWidth,
+                                openingY,
+                                -faceplateThickness
+                            );
+                        } else {
+                            // Outer gusset on right side of opening  
+                            outerGusset.position.set(
+                                localOpeningEnd,
+                                openingY,
+                                -faceplateThickness
+                            );
+                        }
+                        group.add(outerGusset);
+                    }
+                }
+            }
+            
+            // Rack ear - on the outer edge
+            const earSide = bracketSide;  // Left bracket gets left ear, right bracket gets right ear
+            
+            if (addRackHoles) {
+                const holeRadius = 3.175;
+                
+                let holeX, earXStart, earXEnd;
+                if (earSide === 'left') {
+                    holeX = -EAR_WIDTH / 2;
+                    earXStart = -EAR_WIDTH;
+                    earXEnd = 0;
+                } else {
+                    holeX = faceplateWidth + EAR_WIDTH / 2;
+                    earXStart = faceplateWidth;
+                    earXEnd = faceplateWidth + EAR_WIDTH;
+                }
+                
+                const holePositions = [];
+                for (let u = 0; u < rackUnits; u++) {
+                    const baseY = u * RACK_UNIT_HEIGHT;
+                    holePositions.push(baseY + 6.35);
+                    holePositions.push(baseY + 22.225);
+                    holePositions.push(baseY + 38.1);
+                }
+                
+                const earShape = new THREE.Shape();
+                earShape.moveTo(earXStart, 0);
+                earShape.lineTo(earXEnd, 0);
+                earShape.lineTo(earXEnd, faceplateHeight);
+                earShape.lineTo(earXStart, faceplateHeight);
+                earShape.lineTo(earXStart, 0);
+                
+                holePositions.forEach(holeY => {
+                    const holePath = new THREE.Path();
+                    holePath.absarc(holeX, holeY, holeRadius, 0, Math.PI * 2, true);
+                    earShape.holes.push(holePath);
+                });
+                
+                const extrudeSettings = {
+                    steps: 1,
+                    depth: faceplateThickness,
+                    bevelEnabled: false
+                };
+                
+                const earGeom = new THREE.ExtrudeGeometry(earShape, extrudeSettings);
+                const earMesh = new THREE.Mesh(earGeom, earMat);
+                earMesh.position.set(0, 0, -faceplateThickness);
+                group.add(earMesh);
+            } else {
+                const earGeom = new THREE.BoxGeometry(EAR_WIDTH, faceplateHeight, faceplateThickness);
+                const earMesh = new THREE.Mesh(earGeom, earMat);
+                if (earSide === 'left') {
+                    earMesh.position.set(-EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+                } else {
+                    earMesh.position.set(faceplateWidth + EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+                }
+                group.add(earMesh);
+            }
+            
+            // Joining flanges - TOP and BOTTOM (to connect to the other bracket)
+            const flangeWidth = flangeThickness;
+            const flangeDepth = 50.8;  // 2 inches
+            const m3HoleRadius = 1.6;
+            const m3HoleMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+            
+            // Determine flange X position (on the INNER edge, towards center of rack)
+            let flangeX;
+            if (bracketSide === 'left') {
+                flangeX = faceplateWidth - flangeWidth/2;  // Right edge of left bracket
+            } else {
+                flangeX = flangeWidth/2;  // Left edge of right bracket
+            }
+            
+            // Bottom flange (below opening, at bottom of faceplate)
+            const bottomFlangeHeight = openingY;  // Height from bottom to opening
+            if (bottomFlangeHeight > 10) {  // Only add if there's room
+                const bottomFlangeGeom = new THREE.BoxGeometry(flangeWidth, bottomFlangeHeight, flangeDepth);
+                const bottomFlangeMesh = new THREE.Mesh(bottomFlangeGeom, flangeMat);
+                bottomFlangeMesh.position.set(
+                    flangeX,
+                    bottomFlangeHeight/2,
+                    -faceplateThickness - flangeDepth/2
+                );
+                group.add(bottomFlangeMesh);
+                
+                // M3 holes in bottom flange
+                const numBottomHoles = Math.max(1, Math.floor(bottomFlangeHeight / 25));
+                const bottomSpacing = bottomFlangeHeight / (numBottomHoles + 1);
+                const zFront = -faceplateThickness - 15;
+                const zBack = -faceplateThickness - flangeDepth + 15;
+                
+                for (let i = 1; i <= numBottomHoles; i++) {
+                    const holeY = i * bottomSpacing;
+                    [zFront, zBack].forEach(zPos => {
+                        const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
+                        const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
+                        holeMesh.rotation.z = Math.PI / 2;
+                        holeMesh.position.set(flangeX, holeY, zPos);
+                        group.add(holeMesh);
+                    });
+                }
+            }
+            
+            // Top flange (above opening, at top of faceplate)
+            const topFlangeHeight = faceplateHeight - openingY - openingHeight;
+            if (topFlangeHeight > 10) {  // Only add if there's room
+                const topFlangeGeom = new THREE.BoxGeometry(flangeWidth, topFlangeHeight, flangeDepth);
+                const topFlangeMesh = new THREE.Mesh(topFlangeGeom, flangeMat);
+                topFlangeMesh.position.set(
+                    flangeX,
+                    openingY + openingHeight + topFlangeHeight/2,
+                    -faceplateThickness - flangeDepth/2
+                );
+                group.add(topFlangeMesh);
+                
+                // M3 holes in top flange
+                const numTopHoles = Math.max(1, Math.floor(topFlangeHeight / 25));
+                const topSpacing = topFlangeHeight / (numTopHoles + 1);
+                const zFront = -faceplateThickness - 15;
+                const zBack = -faceplateThickness - flangeDepth + 15;
+                
+                for (let i = 1; i <= numTopHoles; i++) {
+                    const holeY = openingY + openingHeight + i * topSpacing;
+                    [zFront, zBack].forEach(zPos => {
+                        const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
+                        const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
+                        holeMesh.rotation.z = Math.PI / 2;
+                        holeMesh.position.set(flangeX, holeY, zPos);
+                        group.add(holeMesh);
+                    });
+                }
+            }
+            
+            // Flange gussets - at corners connecting faceplate to flanges
+            const gussetHeight = gussetSize;
+            const gussetDepth = gussetSize;
+            const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 });
+            
+            const gussetShape = new THREE.Shape();
+            gussetShape.moveTo(0, 0);
+            gussetShape.lineTo(0, gussetHeight);
+            gussetShape.lineTo(-gussetDepth, 0);
+            gussetShape.lineTo(0, 0);
+            
+            const gussetExtrudeSettings = {
+                steps: 1,
+                depth: flangeWidth,
+                bevelEnabled: false
+            };
+            
+            const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, gussetExtrudeSettings);
+            
+            // Bottom corner gusset
+            const bottomGusset = new THREE.Mesh(gussetGeom, gussetMat);
+            bottomGusset.rotation.x = -Math.PI / 2;
+            if (bracketSide === 'left') {
+                bottomGusset.position.set(faceplateWidth - flangeWidth, 10, -faceplateThickness);
+            } else {
+                bottomGusset.position.set(0, 10, -faceplateThickness);
+            }
+            group.add(bottomGusset);
+            
+            // Top corner gusset
+            const topGusset = new THREE.Mesh(gussetGeom.clone(), gussetMat);
+            topGusset.rotation.x = -Math.PI / 2;
+            if (bracketSide === 'left') {
+                topGusset.position.set(faceplateWidth - flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
+            } else {
+                topGusset.position.set(0, faceplateHeight - gussetHeight, -faceplateThickness);
+            }
+            group.add(topGusset);
+            
+            return group;
+        }
+
         // Generate Mount Bracket Geometry
         // This creates a preview that matches the STL generator output
         function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize) {
             const group = new THREE.Group();
             
+            // Check if wide device mode is needed
+            if (isWideDeviceMode(width, tolerance)) {
+                // Generate BOTH brackets for wide device
+                const RACK_HALF_WIDTH = 225.0;
+                
+                // Left bracket
+                const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'left');
+                leftBracket.position.set(-RACK_HALF_WIDTH/2, 0, 0);
+                group.add(leftBracket);
+                
+                // Right bracket - offset to the right
+                const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'right');
+                rightBracket.position.set(RACK_HALF_WIDTH/2, 0, 0);
+                group.add(rightBracket);
+                
+                // Calculate centering offset
+                const RACK_UNIT_HEIGHT = 44.45;
+                const DEVICE_HEIGHT_PER_U = 35.0;
+                const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+                const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
+                
+                // Center the combined group
+                group.position.set(0, -faceplateHeight/2, 0);
+                
+                return group;
+            }
+            
+            // Standard single-bracket mode (original code)
             // Constants matching STL generator
             const RACK_HALF_WIDTH = 225.0;  // Half of 19" rack inside width
             const RACK_UNIT_HEIGHT = 44.45; // 1U in mm
@@ -874,18 +1254,18 @@
             const oldDevice = scene.getObjectByName('deviceMesh');
             if (oldDevice) scene.remove(oldDevice);
 
-            // Add device representation (semi-transparent)
-            // Position device inside the opening, resting on the shelf
+            // Constants
             const RACK_HALF_WIDTH = 225.0;
+            const FULL_RACK_WIDTH = RACK_HALF_WIDTH * 2;
             const RACK_UNIT_HEIGHT = 44.45;
             const DEVICE_HEIGHT_PER_U = 35.0;
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
             const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
             const openingWidth = width + 2 * tolerance;
             const openingHeight = height + 2 * tolerance;
-            const openingX = (RACK_HALF_WIDTH - openingWidth) / 2;
             const openingY = (faceplateHeight - openingHeight) / 2;
             
+            // Add device representation (semi-transparent)
             const deviceGeometry = new THREE.BoxGeometry(width, height, depth);
             const deviceMaterial = new THREE.MeshPhongMaterial({
                 color: 0xff6b6b,
@@ -895,16 +1275,41 @@
             });
             const deviceMesh = new THREE.Mesh(deviceGeometry, deviceMaterial);
             deviceMesh.name = 'deviceMesh';
-            // Position device centered in opening, extending back from faceplate
-            deviceMesh.position.set(
-                openingX + openingWidth/2 - RACK_HALF_WIDTH/2,
-                openingY + tolerance + height/2 - faceplateHeight/2,
-                -(wallThickness + depth/2)
-            );
+            
+            // Position device based on mode
+            if (isWideDeviceMode(width, tolerance)) {
+                // Wide mode: device is centered in full-width rack
+                deviceMesh.position.set(
+                    0,  // Centered in full-width
+                    openingY + tolerance + height/2 - faceplateHeight/2,
+                    -(wallThickness + depth/2)
+                );
+            } else {
+                // Standard mode: device centered in half-width
+                const openingX = (RACK_HALF_WIDTH - openingWidth) / 2;
+                deviceMesh.position.set(
+                    openingX + openingWidth/2 - RACK_HALF_WIDTH/2,
+                    openingY + tolerance + height/2 - faceplateHeight/2,
+                    -(wallThickness + depth/2)
+                );
+            }
             scene.add(deviceMesh);
 
             // Calculate stats
             calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness);
+            
+            // Update wide mode indicator
+            updateWideModeIndicator(width, tolerance);
+        }
+        
+        function updateWideModeIndicator(width, tolerance) {
+            const indicator = document.getElementById('wideModeIndicator');
+            if (isWideDeviceMode(width, tolerance)) {
+                indicator.style.display = 'block';
+                indicator.innerHTML = '⚠️ <strong>Wide Device Mode:</strong> Device spans full rack width. Two brackets will be generated (left + right) with joining flanges above and below the device.';
+            } else {
+                indicator.style.display = 'none';
+            }
         }
 
         function calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness) {
@@ -913,22 +1318,41 @@
             const RACK_UNIT_HEIGHT = 44.45;
             const DEVICE_HEIGHT_PER_U = 35.0;
             
+            // Check if wide mode
+            const wideMode = isWideDeviceMode(width, tolerance);
+            
             // Calculate dimensions
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
             const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
             const openingWidth = width + 2 * tolerance;
             const openingHeight = height + 2 * tolerance;
             
-            // Faceplate volume (solid minus opening)
-            const faceplateVolume = (RACK_HALF_WIDTH * faceplateHeight * wallThickness) - 
-                                    (openingWidth * openingHeight * wallThickness);
+            let totalVolume;
+            let numParts;
             
-            // Shelf volume
-            const shelfDepth = depth + 10;
-            const shelfVolume = openingWidth * shelfThickness * shelfDepth;
-            
-            // Total volume in cm³
-            const totalVolume = (faceplateVolume + shelfVolume) / 1000;
+            if (wideMode) {
+                // Two brackets, each half-width
+                // Each faceplate has partial opening
+                const faceplateVolume = (RACK_HALF_WIDTH * faceplateHeight * wallThickness) * 2;
+                const openingVolume = openingWidth * openingHeight * wallThickness;
+                const netFaceplateVolume = faceplateVolume - openingVolume;
+                
+                // Shelf spans opening (roughly)
+                const shelfDepth = depth + 10;
+                const shelfVolume = openingWidth * shelfThickness * shelfDepth;
+                
+                totalVolume = (netFaceplateVolume + shelfVolume) / 1000;
+                numParts = 2;
+            } else {
+                // Single bracket
+                const faceplateVolume = (RACK_HALF_WIDTH * faceplateHeight * wallThickness) - 
+                                        (openingWidth * openingHeight * wallThickness);
+                const shelfDepth = depth + 10;
+                const shelfVolume = openingWidth * shelfThickness * shelfDepth;
+                
+                totalVolume = (faceplateVolume + shelfVolume) / 1000;
+                numParts = 1;
+            }
 
             const infill = parseInt(document.getElementById('infill').value) / 100;
             const estimatedVolume = totalVolume * infill;
@@ -936,7 +1360,7 @@
 
             document.getElementById('volumeValue').textContent = totalVolume.toFixed(1);
             document.getElementById('weightValue').textContent = estimatedWeight.toFixed(1);
-            document.getElementById('partsValue').textContent = '1';
+            document.getElementById('partsValue').textContent = numParts.toString();
 
             // Rough estimate: 0.5 hours per 10cm³ at 20% infill
             const printHours = (estimatedVolume / 10) * 0.5;
@@ -971,16 +1395,69 @@
             return stlBinary;
         }
         
+        // Export a specific bracket (for wide mode)
+        function exportBracketSTL(bracketSide) {
+            const width = parseFloat(document.getElementById('deviceWidth').value);
+            const height = parseFloat(document.getElementById('deviceHeight').value);
+            const depth = parseFloat(document.getElementById('deviceDepth').value);
+            const tolerance = parseFloat(document.getElementById('tolerance').value);
+            const wallThickness = parseFloat(document.getElementById('wallThickness').value);
+            const shelfThickness = parseFloat(document.getElementById('shelfThickness').value);
+            const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
+            const gussetSize = parseFloat(document.getElementById('gussetSize').value);
+            const addSupport = document.getElementById('addSupport').checked;
+            
+            const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, bracketSide);
+            
+            const exporter = new THREE.STLExporter();
+            const exportGroup = new THREE.Group();
+            
+            bracket.traverse((child) => {
+                if (child.isMesh) {
+                    const clonedMesh = child.clone();
+                    clonedMesh.applyMatrix4(bracket.matrixWorld);
+                    exportGroup.add(clonedMesh);
+                }
+            });
+            
+            return exporter.parse(exportGroup, { binary: true });
+        }
+        
         function downloadSTLFromPreview() {
-            const stlData = exportSTL();
+            const width = parseFloat(document.getElementById('deviceWidth').value);
+            const tolerance = parseFloat(document.getElementById('tolerance').value);
+            
+            if (isWideDeviceMode(width, tolerance)) {
+                // Wide mode: download two files
+                downloadBracket('left');
+                // Small delay between downloads
+                setTimeout(() => downloadBracket('right'), 500);
+            } else {
+                // Standard mode: single file
+                const stlData = exportSTL();
+                if (!stlData) return;
+                
+                const blob = new Blob([stlData], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'rack_mount_bracket.stl';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        }
+        
+        function downloadBracket(side) {
+            const stlData = exportBracketSTL(side);
             if (!stlData) return;
             
-            // Create download link
             const blob = new Blob([stlData], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'rack_mount_bracket.stl';
+            link.download = `rack_mount_bracket_${side}.stl`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1000,23 +1477,47 @@
                 // Short delay to show the message
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
+                const width = parseFloat(document.getElementById('deviceWidth').value);
+                const tolerance = parseFloat(document.getElementById('tolerance').value);
+                const wideMode = isWideDeviceMode(width, tolerance);
+                
                 // Export directly from Three.js
                 downloadSTLFromPreview();
                 
                 // Display success message
                 statusDiv.innerHTML = `<p class="success">✓ STL exported successfully!</p>`;
                 
-                // Show a simple file info display
+                // Show file info display based on mode
                 const fileList = document.getElementById('fileList');
-                fileList.innerHTML = `
-                    <div class="file-item">
-                        <div>
-                            <div class="file-name">📄 rack_mount_bracket.stl</div>
-                            <div class="file-size">Exported from preview</div>
+                
+                if (wideMode) {
+                    fileList.innerHTML = `
+                        <div class="file-item">
+                            <div>
+                                <div class="file-name">📄 rack_mount_bracket_left.stl</div>
+                                <div class="file-size">Left bracket (with left rack ear)</div>
+                            </div>
+                            <button class="btn-download" onclick="downloadBracket('left')">⬇ Download</button>
                         </div>
-                        <button class="btn-download" onclick="downloadSTLFromPreview()">⬇ Download Again</button>
-                    </div>
-                `;
+                        <div class="file-item">
+                            <div>
+                                <div class="file-name">📄 rack_mount_bracket_right.stl</div>
+                                <div class="file-size">Right bracket (with right rack ear)</div>
+                            </div>
+                            <button class="btn-download" onclick="downloadBracket('right')">⬇ Download</button>
+                        </div>
+                    `;
+                } else {
+                    fileList.innerHTML = `
+                        <div class="file-item">
+                            <div>
+                                <div class="file-name">📄 rack_mount_bracket.stl</div>
+                                <div class="file-size">Exported from preview</div>
+                            </div>
+                            <button class="btn-download" onclick="downloadSTLFromPreview()">⬇ Download Again</button>
+                        </div>
+                    `;
+                }
                 document.getElementById('filesContainer').style.display = 'block';
                 
             } catch (error) {
