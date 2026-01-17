@@ -767,12 +767,17 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
     const gussetDepth = gussetSize;   // Depth along the flange (Z)
     const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Same purple as flange
     
-    // Create gusset shape (right triangle in Y-Z plane)
-    // Triangle: corner at origin, one leg up Y, one leg along -Z
+    // Create gusset shape - direction depends on ear side
+    // When ear is left, flange is right (inner), gusset points left (into faceplate)
+    // When ear is right, flange is left (inner), gusset points right (into faceplate)
     const gussetShape = new THREE.Shape();
     gussetShape.moveTo(0, 0);  // Corner (at faceplate back / flange front)
     gussetShape.lineTo(0, gussetHeight);  // Up the faceplate back
-    gussetShape.lineTo(-gussetDepth, 0);  // Along the flange (into rack)
+    if (earSide === 'left') {
+        gussetShape.lineTo(-gussetDepth, 0);  // Along the flange (into rack, pointing left)
+    } else {
+        gussetShape.lineTo(gussetDepth, 0);  // Along the flange (into rack, pointing right)
+    }
     gussetShape.lineTo(0, 0);
     
     const gussetExtrudeSettings = {
