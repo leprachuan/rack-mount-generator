@@ -75,9 +75,13 @@ def generate_mount():
             'depth': float(data['depth']),
             'tolerance': float(data['tolerance']),
             'wall_thickness': float(data['wallThickness']),
+            'shelf_thickness': float(data.get('shelfThickness', 5.0)),
+            'flange_thickness': float(data.get('flangeThickness', 5.0)),
+            'gusset_size': float(data.get('gussetSize', 15.0)),
             'add_support': data.get('addSupport', True),
             'add_rack_holes': data.get('addRackHoles', True),
             'ear_side': data.get('earSide', 'left'),
+            'is_blank': data.get('isBlank', False),
             'infill': int(data.get('infill', 20)),
             'bed_size': data.get('bedSize', 'prusa'),
             'timestamp': datetime.now().isoformat()
@@ -100,7 +104,11 @@ def generate_mount():
             config['wall_thickness'],
             config['add_support'],
             config['add_rack_holes'],
-            ear_side=config['ear_side']
+            shelf_thickness=config['shelf_thickness'],
+            flange_thickness=config['flange_thickness'],
+            gusset_size=config['gusset_size'],
+            ear_side=config['ear_side'],
+            is_blank=config['is_blank']
         )
 
         # Create unique output directory

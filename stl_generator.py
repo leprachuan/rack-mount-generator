@@ -35,17 +35,23 @@ class RackMountGenerator:
                  add_support: bool = True,
                  add_rack_holes: bool = True,
                  shelf_thickness: float = 5.0,  # Support shelf thickness
-                 ear_side: str = 'left'):  # Which side the rack ear goes on: 'left' or 'right'
+                 flange_thickness: float = 5.0,  # Joining flange thickness
+                 gusset_size: float = 15.0,  # Size of triangular gussets
+                 ear_side: str = 'left',  # Which side the rack ear goes on: 'left' or 'right'
+                 is_blank: bool = False):  # If True, no cutout or shelf - just a blank panel
         """Initialize the mount generator"""
         self.device_width = device_width
         self.device_height = device_height
         self.device_depth = device_depth
         self.tolerance = tolerance
         self.wall_thickness = wall_thickness  # Faceplate thickness
-        self.add_support = add_support
+        self.add_support = add_support if not is_blank else False  # No support for blanks
         self.add_rack_holes = add_rack_holes
         self.shelf_thickness = shelf_thickness
+        self.flange_thickness = flange_thickness
+        self.gusset_size = gusset_size
         self.ear_side = ear_side
+        self.is_blank = is_blank
         
         # Rack ear dimensions
         self.ear_width = 15.875  # Standard rack ear width (~5/8")
@@ -78,6 +84,7 @@ class RackMountGenerator:
     def create_faceplate_with_hole(self) -> List[List[List[float]]]:
         """
         Create faceplate with device cutout hole and support shelf.
+        If is_blank is True, creates a solid faceplate with no cutout.
         
         Coordinate system:
         - X: width (left to right)
@@ -100,74 +107,88 @@ class RackMountGenerator:
         op_y2 = op_y + op_h  # Top edge of opening
 
         # ============================================
-        # FRONT FACE of faceplate (Z = 0)
-        # We need to draw the front face with a rectangular hole
+        # BLANK PANEL - solid faceplate with no cutout
         # ============================================
-        
-        # Bottom strip (below opening)
-        if op_y > 0:
+        if self.is_blank:
+            # Front face - solid rectangle
             self.add_quad(triangles,
-                [0, 0, 0], [fp_w, 0, 0], [fp_w, op_y, 0], [0, op_y, 0])
-        
-        # Top strip (above opening)
-        if op_y2 < fp_h:
+                [0, 0, 0], [fp_w, 0, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
+            
+            # Back face - solid rectangle
             self.add_quad(triangles,
-                [0, op_y2, 0], [fp_w, op_y2, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
-        
-        # Left strip (beside opening, between bottom and top strips)
-        if op_x > 0:
-            self.add_quad(triangles,
-                [0, op_y, 0], [op_x, op_y, 0], [op_x, op_y2, 0], [0, op_y2, 0])
-        
-        # Right strip (beside opening, between bottom and top strips)
-        if op_x2 < fp_w:
-            self.add_quad(triangles,
-                [op_x2, op_y, 0], [fp_w, op_y, 0], [fp_w, op_y2, 0], [op_x2, op_y2, 0])
+                [0, 0, -fp_t], [0, fp_h, -fp_t], [fp_w, fp_h, -fp_t], [fp_w, 0, -fp_t])
+            
+            # Skip to outer edges (no hole inner walls needed)
+        else:
+            # ============================================
+            # FRONT FACE of faceplate (Z = 0)
+            # We need to draw the front face with a rectangular hole
+            # ============================================
+            
+            # Bottom strip (below opening)
+            if op_y > 0:
+                self.add_quad(triangles,
+                    [0, 0, 0], [fp_w, 0, 0], [fp_w, op_y, 0], [0, op_y, 0])
+            
+            # Top strip (above opening)
+            if op_y2 < fp_h:
+                self.add_quad(triangles,
+                    [0, op_y2, 0], [fp_w, op_y2, 0], [fp_w, fp_h, 0], [0, fp_h, 0])
+            
+            # Left strip (beside opening, between bottom and top strips)
+            if op_x > 0:
+                self.add_quad(triangles,
+                    [0, op_y, 0], [op_x, op_y, 0], [op_x, op_y2, 0], [0, op_y2, 0])
+            
+            # Right strip (beside opening, between bottom and top strips)
+            if op_x2 < fp_w:
+                self.add_quad(triangles,
+                    [op_x2, op_y, 0], [fp_w, op_y, 0], [fp_w, op_y2, 0], [op_x2, op_y2, 0])
 
-        # ============================================
-        # BACK FACE of faceplate (Z = -fp_t)
-        # Same layout but with hole, and reversed winding
-        # ============================================
-        
-        # Bottom strip
-        if op_y > 0:
-            self.add_quad(triangles,
-                [0, 0, -fp_t], [0, op_y, -fp_t], [fp_w, op_y, -fp_t], [fp_w, 0, -fp_t])
-        
-        # Top strip
-        if op_y2 < fp_h:
-            self.add_quad(triangles,
-                [0, op_y2, -fp_t], [0, fp_h, -fp_t], [fp_w, fp_h, -fp_t], [fp_w, op_y2, -fp_t])
-        
-        # Left strip
-        if op_x > 0:
-            self.add_quad(triangles,
-                [0, op_y, -fp_t], [0, op_y2, -fp_t], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
-        
-        # Right strip
-        if op_x2 < fp_w:
-            self.add_quad(triangles,
-                [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [fp_w, op_y2, -fp_t], [fp_w, op_y, -fp_t])
+            # ============================================
+            # BACK FACE of faceplate (Z = -fp_t)
+            # Same layout but with hole, and reversed winding
+            # ============================================
+            
+            # Bottom strip
+            if op_y > 0:
+                self.add_quad(triangles,
+                    [0, 0, -fp_t], [0, op_y, -fp_t], [fp_w, op_y, -fp_t], [fp_w, 0, -fp_t])
+            
+            # Top strip
+            if op_y2 < fp_h:
+                self.add_quad(triangles,
+                    [0, op_y2, -fp_t], [0, fp_h, -fp_t], [fp_w, fp_h, -fp_t], [fp_w, op_y2, -fp_t])
+            
+            # Left strip
+            if op_x > 0:
+                self.add_quad(triangles,
+                    [0, op_y, -fp_t], [0, op_y2, -fp_t], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
+            
+            # Right strip
+            if op_x2 < fp_w:
+                self.add_quad(triangles,
+                    [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [fp_w, op_y2, -fp_t], [fp_w, op_y, -fp_t])
 
-        # ============================================
-        # HOLE INNER WALLS (connecting front to back through the cutout)
-        # ============================================
-        
-        # Top inner wall of hole
-        self.add_quad(triangles,
-            [op_x, op_y2, 0], [op_x2, op_y2, 0], [op_x2, op_y2, -fp_t], [op_x, op_y2, -fp_t])
-        
-        # Bottom inner wall of hole
-        self.add_quad(triangles,
-            [op_x, op_y, 0], [op_x, op_y, -fp_t], [op_x2, op_y, -fp_t], [op_x2, op_y, 0])
-        
-        # Left inner wall of hole
-        self.add_quad(triangles,
-            [op_x, op_y, 0], [op_x, op_y2, 0], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
-        
-        # Right inner wall of hole
-        self.add_quad(triangles,
-            [op_x2, op_y, 0], [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [op_x2, op_y2, 0])
+            # ============================================
+            # HOLE INNER WALLS (connecting front to back through the cutout)
+            # ============================================
+            
+            # Top inner wall of hole
+            self.add_quad(triangles,
+                [op_x, op_y2, 0], [op_x2, op_y2, 0], [op_x2, op_y2, -fp_t], [op_x, op_y2, -fp_t])
+            
+            # Bottom inner wall of hole
+            self.add_quad(triangles,
+                [op_x, op_y, 0], [op_x, op_y, -fp_t], [op_x2, op_y, -fp_t], [op_x2, op_y, 0])
+            
+            # Left inner wall of hole
+            self.add_quad(triangles,
+                [op_x, op_y, 0], [op_x, op_y2, 0], [op_x, op_y2, -fp_t], [op_x, op_y, -fp_t])
+            
+            # Right inner wall of hole
+            self.add_quad(triangles,
+                [op_x2, op_y, 0], [op_x2, op_y, -fp_t], [op_x2, op_y2, -fp_t], [op_x2, op_y2, 0])
 
         # ============================================
         # OUTER EDGES of faceplate
@@ -198,7 +219,7 @@ class RackMountGenerator:
         if self.add_support:
             shelf_t = self.shelf_thickness
             shelf_d = self.shelf_depth
-            gusset_width = 15.0  # Extra width on each side for gussets
+            gusset_width = self.gusset_size  # Extra width on each side for gussets
             
             # Shelf is positioned at the bottom of the opening
             # It starts at Z = -fp_t (back of faceplate) and extends to Z = -(fp_t + shelf_d)
@@ -388,7 +409,8 @@ class RackMountGenerator:
         if self.add_rack_holes:
             holes = self.calculate_mounting_holes()
             for hx, hy in holes:
-                hole_tris = self.create_hole(hx, hy, self.HOLE_DIAMETER / 2, ear_t, segments=16)
+                # Create hole with slight extension beyond surfaces for clean boolean
+                hole_tris = self.create_hole_extended(hx, hy, self.HOLE_DIAMETER / 2, ear_t, segments=16)
                 triangles.extend(hole_tris)
 
         # ============================================
@@ -396,7 +418,7 @@ class RackMountGenerator:
         # This flange extends back into the rack and has M3 holes
         # for connecting two brackets together
         # ============================================
-        flange_width = 5.0  # Width of the joining flange (thin for short M3 screws)
+        flange_width = self.flange_thickness  # Width of the joining flange
         flange_depth = 50.8  # 2 inches back into rack
         flange_thickness = fp_t  # Same thickness as faceplate
         
@@ -466,85 +488,99 @@ class RackMountGenerator:
         
         # ============================================
         # FLANGE GUSSETS (small triangular supports)
-        # Right-angle triangles connecting faceplate back to flange
-        # Gussets sit on the INNER side of the flange (toward center of faceplate)
+        # Right-angle triangles in Y-Z plane, extruded along flange width (X)
+        # They connect the faceplate back to the flange
         # ============================================
-        gusset_height = 15.0  # Height along the faceplate back (Y direction)
-        gusset_depth = 15.0   # Depth along the flange (Z direction)
-        gusset_width = 10.0   # Width extending from flange toward faceplate center
+        gusset_height = self.gusset_size  # Height up the faceplate back (Y direction)
+        gusset_depth = self.gusset_size   # Depth along the flange (Z direction, into rack)
         
-        # Gusset X positions - extend from inner edge of flange toward faceplate center
-        if self.ear_side == 'left':
-            gusset_x_outer = flange_x1  # Inner edge of flange
-            gusset_x_inner = flange_x1 - gusset_width  # Toward center
-        else:
-            gusset_x_outer = flange_x2  # Inner edge of flange
-            gusset_x_inner = flange_x2 + gusset_width  # Toward center
+        # Gusset X positions span the flange width
+        gusset_x1 = flange_x1
+        gusset_x2 = flange_x2
         
-        # Bottom gusset
-        # Outer face (on the flange side)
-        triangles.append([
-            [gusset_x_outer, 0, flange_z_front],  # Corner
-            [gusset_x_outer, gusset_height, flange_z_front],  # Up faceplate
-            [gusset_x_outer, 0, flange_z_front - gusset_depth]  # Along flange
-        ])
-        # Inner face (toward faceplate center)
-        triangles.append([
-            [gusset_x_inner, 0, flange_z_front],  # Corner
-            [gusset_x_inner, 0, flange_z_front - gusset_depth],  # Along flange
-            [gusset_x_inner, gusset_height, flange_z_front]  # Up faceplate
-        ])
-        # Bottom face
-        self.add_quad(triangles,
-            [gusset_x_inner, 0, flange_z_front],
-            [gusset_x_outer, 0, flange_z_front],
-            [gusset_x_outer, 0, flange_z_front - gusset_depth],
-            [gusset_x_inner, 0, flange_z_front - gusset_depth])
-        # Hypotenuse (diagonal face)
-        self.add_quad(triangles,
-            [gusset_x_inner, gusset_height, flange_z_front],
-            [gusset_x_inner, 0, flange_z_front - gusset_depth],
-            [gusset_x_outer, 0, flange_z_front - gusset_depth],
-            [gusset_x_outer, gusset_height, flange_z_front])
-        # Front face (on faceplate back)
-        self.add_quad(triangles,
-            [gusset_x_inner, 0, flange_z_front],
-            [gusset_x_inner, gusset_height, flange_z_front],
-            [gusset_x_outer, gusset_height, flange_z_front],
-            [gusset_x_outer, 0, flange_z_front])
+        # Bottom gusset - right triangle with corner lifted 10mm from bottom
+        # Triangle vertices in Y-Z plane (at each X):
+        #   Corner: (Y=10, Z=flange_z_front) - at faceplate back, 10mm up
+        #   Up:     (Y=10+gusset_height, Z=flange_z_front) - up the faceplate back
+        #   Back:   (Y=10, Z=flange_z_front - gusset_depth) - along the flange
+        bottom_gusset_y = 10.0  # Lift bottom gusset up by 10mm
         
-        # Top gusset - same as bottom but shifted up
-        top_gusset_y = fp_h - gusset_height
-        # Outer face
+        # Left face of bottom gusset (at gusset_x1) - normal should point in -X
         triangles.append([
-            [gusset_x_outer, top_gusset_y, flange_z_front],  # Corner
-            [gusset_x_outer, top_gusset_y + gusset_height, flange_z_front],  # Up faceplate
-            [gusset_x_outer, top_gusset_y, flange_z_front - gusset_depth]  # Along flange
+            [gusset_x1, bottom_gusset_y, flange_z_front],  # Corner
+            [gusset_x1, bottom_gusset_y + gusset_height, flange_z_front],  # Up
+            [gusset_x1, bottom_gusset_y, flange_z_front - gusset_depth]  # Back
         ])
-        # Inner face
+        
+        # Right face of bottom gusset (at gusset_x2) - normal should point in +X
         triangles.append([
-            [gusset_x_inner, top_gusset_y, flange_z_front],  # Corner
-            [gusset_x_inner, top_gusset_y, flange_z_front - gusset_depth],  # Along flange
-            [gusset_x_inner, top_gusset_y + gusset_height, flange_z_front]  # Up faceplate
+            [gusset_x2, bottom_gusset_y, flange_z_front],  # Corner
+            [gusset_x2, bottom_gusset_y, flange_z_front - gusset_depth],  # Back
+            [gusset_x2, bottom_gusset_y + gusset_height, flange_z_front]  # Up
         ])
-        # Bottom face
+        
+        # Bottom face of bottom gusset (Y=bottom_gusset_y plane)
         self.add_quad(triangles,
-            [gusset_x_inner, top_gusset_y, flange_z_front],
-            [gusset_x_outer, top_gusset_y, flange_z_front],
-            [gusset_x_outer, top_gusset_y, flange_z_front - gusset_depth],
-            [gusset_x_inner, top_gusset_y, flange_z_front - gusset_depth])
-        # Hypotenuse
+            [gusset_x1, bottom_gusset_y, flange_z_front],
+            [gusset_x2, bottom_gusset_y, flange_z_front],
+            [gusset_x2, bottom_gusset_y, flange_z_front - gusset_depth],
+            [gusset_x1, bottom_gusset_y, flange_z_front - gusset_depth])
+        
+        # Hypotenuse face of bottom gusset (diagonal from top-front to bottom-back)
         self.add_quad(triangles,
-            [gusset_x_inner, top_gusset_y + gusset_height, flange_z_front],
-            [gusset_x_inner, top_gusset_y, flange_z_front - gusset_depth],
-            [gusset_x_outer, top_gusset_y, flange_z_front - gusset_depth],
-            [gusset_x_outer, top_gusset_y + gusset_height, flange_z_front])
-        # Front face (on faceplate back)
+            [gusset_x1, bottom_gusset_y + gusset_height, flange_z_front],
+            [gusset_x1, bottom_gusset_y, flange_z_front - gusset_depth],
+            [gusset_x2, bottom_gusset_y, flange_z_front - gusset_depth],
+            [gusset_x2, bottom_gusset_y + gusset_height, flange_z_front])
+        
+        # Front face of bottom gusset (on faceplate back, Z=flange_z_front)
         self.add_quad(triangles,
-            [gusset_x_inner, top_gusset_y, flange_z_front],
-            [gusset_x_inner, top_gusset_y + gusset_height, flange_z_front],
-            [gusset_x_outer, top_gusset_y + gusset_height, flange_z_front],
-            [gusset_x_outer, top_gusset_y, flange_z_front])
+            [gusset_x1, bottom_gusset_y, flange_z_front],
+            [gusset_x1, bottom_gusset_y + gusset_height, flange_z_front],
+            [gusset_x2, bottom_gusset_y + gusset_height, flange_z_front],
+            [gusset_x2, bottom_gusset_y, flange_z_front])
+        
+        # Top gusset - same triangle but at top of faceplate
+        # Corner is at (Y=fp_h - gusset_height), going DOWN to connect to top of faceplate
+        # Actually, we want the gusset to be "upside down" - corner at TOP
+        #   Corner: (Y=fp_h, Z=flange_z_front) - at top of faceplate back  
+        #   Down:   (Y=fp_h - gusset_height, Z=flange_z_front) - down the faceplate back
+        #   Back:   (Y=fp_h, Z=flange_z_front - gusset_depth) - along the flange
+        
+        # Left face of top gusset - normal should point in -X
+        triangles.append([
+            [gusset_x1, fp_h, flange_z_front],  # Corner at top
+            [gusset_x1, fp_h, flange_z_front - gusset_depth],  # Back
+            [gusset_x1, fp_h - gusset_height, flange_z_front]  # Down
+        ])
+        
+        # Right face of top gusset - normal should point in +X
+        triangles.append([
+            [gusset_x2, fp_h, flange_z_front],  # Corner at top
+            [gusset_x2, fp_h - gusset_height, flange_z_front],  # Down
+            [gusset_x2, fp_h, flange_z_front - gusset_depth]  # Back
+        ])
+        
+        # Top face of top gusset (Y=fp_h plane)
+        self.add_quad(triangles,
+            [gusset_x1, fp_h, flange_z_front],
+            [gusset_x1, fp_h, flange_z_front - gusset_depth],
+            [gusset_x2, fp_h, flange_z_front - gusset_depth],
+            [gusset_x2, fp_h, flange_z_front])
+        
+        # Hypotenuse face of top gusset (diagonal from bottom-front to top-back)
+        self.add_quad(triangles,
+            [gusset_x1, fp_h - gusset_height, flange_z_front],
+            [gusset_x2, fp_h - gusset_height, flange_z_front],
+            [gusset_x2, fp_h, flange_z_front - gusset_depth],
+            [gusset_x1, fp_h, flange_z_front - gusset_depth])
+        
+        # Front face of top gusset (on faceplate back)
+        self.add_quad(triangles,
+            [gusset_x1, fp_h - gusset_height, flange_z_front],
+            [gusset_x1, fp_h, flange_z_front],
+            [gusset_x2, fp_h, flange_z_front],
+            [gusset_x2, fp_h - gusset_height, flange_z_front])
         
         # M3 joining holes through the flange (horizontal, for screwing brackets together)
         joining_holes = self.calculate_joining_holes()
@@ -561,7 +597,9 @@ class RackMountGenerator:
         return triangles
 
     def create_hole(self, cx: float, cy: float, radius: float, depth: float, segments: int = 16) -> List:
-        """Create a cylindrical hole through the faceplate (Z direction)"""
+        """Create a cylindrical hole through material (Z direction).
+        Creates only the cylinder wall - the interior surface of the hole.
+        Normals point inward (toward cylinder axis) to represent removed material."""
         triangles = []
         
         # Generate points around the circle
@@ -575,8 +613,58 @@ class RackMountGenerator:
             y2 = cy + radius * math.sin(angle2)
             
             # Cylinder wall (connecting front to back)
+            # Winding is set so normals point INWARD toward cylinder axis
             triangles.append([[x1, y1, 0], [x2, y2, 0], [x2, y2, -depth]])
             triangles.append([[x1, y1, 0], [x2, y2, -depth], [x1, y1, -depth]])
+        
+        return triangles
+
+    def create_hole_extended(self, cx: float, cy: float, radius: float, depth: float, segments: int = 16) -> List:
+        """Create a cylindrical hole that extends slightly beyond both surfaces.
+        This creates better boolean-like subtraction behavior in slicers.
+        The hole extends 0.1mm beyond both the front (Z=0) and back (Z=-depth) surfaces."""
+        triangles = []
+        extension = 0.1  # Small extension beyond surfaces
+        z_front = extension
+        z_back = -depth - extension
+        
+        # Generate points around the circle
+        for i in range(segments):
+            angle1 = 2 * math.pi * i / segments
+            angle2 = 2 * math.pi * ((i + 1) % segments) / segments
+            
+            x1 = cx + radius * math.cos(angle1)
+            y1 = cy + radius * math.sin(angle1)
+            x2 = cx + radius * math.cos(angle2)
+            y2 = cy + radius * math.sin(angle2)
+            
+            # Cylinder wall with normals pointing OUTWARD (standard solid cylinder)
+            # When intersected with solid ear, slicers typically subtract the inner volume
+            triangles.append([[x1, y1, z_front], [x1, y1, z_back], [x2, y2, z_back]])
+            triangles.append([[x1, y1, z_front], [x2, y2, z_back], [x2, y2, z_front]])
+        
+        # Add end caps to make it a proper closed solid
+        # Front cap (at z_front)
+        for i in range(segments):
+            angle1 = 2 * math.pi * i / segments
+            angle2 = 2 * math.pi * ((i + 1) % segments) / segments
+            x1 = cx + radius * math.cos(angle1)
+            y1 = cy + radius * math.sin(angle1)
+            x2 = cx + radius * math.cos(angle2)
+            y2 = cy + radius * math.sin(angle2)
+            # Front cap facing +Z
+            triangles.append([[cx, cy, z_front], [x1, y1, z_front], [x2, y2, z_front]])
+        
+        # Back cap (at z_back)
+        for i in range(segments):
+            angle1 = 2 * math.pi * i / segments
+            angle2 = 2 * math.pi * ((i + 1) % segments) / segments
+            x1 = cx + radius * math.cos(angle1)
+            y1 = cy + radius * math.sin(angle1)
+            x2 = cx + radius * math.cos(angle2)
+            y2 = cy + radius * math.sin(angle2)
+            # Back cap facing -Z
+            triangles.append([[cx, cy, z_back], [x2, y2, z_back], [x1, y1, z_back]])
         
         return triangles
 

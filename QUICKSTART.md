@@ -2,38 +2,47 @@
 
 ## 5-Minute Setup
 
-### Step 1: Install Python
-1. Download Python 3.8+ from [python.org](https://www.python.org/downloads/)
+### Step 1: Install Python & uv
+1. Download Python 3.11+ from [python.org](https://www.python.org/downloads/)
 2. **Important**: Check "Add Python to PATH" during installation
-3. Verify installation:
+3. Install uv package manager:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+4. Verify installation:
    ```bash
    python --version
+   uv --version
    ```
 
-### Step 2: Extract Files
-1. Extract the `rack_mount_generator.zip` file to your desired location
-2. Open a terminal/command prompt in that directory
-
-### Step 3: Run the Startup Script
-
-**On macOS/Linux:**
+### Step 2: Clone or Extract Files
 ```bash
-chmod +x run.sh
-./run.sh
+git clone https://github.com/leprachuan/rack-mount-generator.git
+cd rack-mount-generator
 ```
 
-**On Windows:**
+### Step 3: Run the Application
+
+**Using uv (recommended):**
 ```bash
-run.bat
+uv sync
+uv run python app.py
 ```
 
-The script will:
-- ✓ Create a Python virtual environment
-- ✓ Install required dependencies
-- ✓ Start the web server
+**Using pip:**
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+The server will:
+- ✓ Start Flask on port 5001
+- ✓ Serve the web interface
 
 ### Step 4: Open in Browser
-Navigate to: **http://localhost:5000**
+Navigate to: **http://localhost:5001**
+
+> **Note**: Port 5001 is used because 5000 is often blocked on macOS.
 
 You should see the 19" Rack Mount Generator interface!
 
@@ -48,16 +57,14 @@ Let's say you want to mount a network switch that's:
 - **Depth**: 200 mm
 
 1. Enter these values in the form
-2. Keep default settings (2mm clearance, 3mm walls, 20% infill)
-3. Click **"Generate Mount"**
+2. Keep default settings (2mm tolerance, 10mm wall thickness)
+3. Enable options:
+   - ✓ Add Support Shelf
+   - ✓ Add Rack Holes
+4. Click **"Generate STL Files"**
 
 ### Download Files
-You'll see 3 STL files ready to download:
-- `bracket_left.stl` - Left mounting bracket
-- `bracket_right.stl` - Right mounting bracket
-- `retention_clip.stl` - Front retention clip
-
-Click the download buttons to save them.
+The STL file downloads automatically - what you see in the preview is exactly what you get!
 
 ---
 
@@ -76,7 +83,7 @@ Click the download buttons to save them.
 
 2. **Open STL File in Slicer**
    - Launch your slicer
-   - Open `bracket_left.stl`
+   - Open the downloaded `rack_mount_*.stl` file
    - Position: Flat side down (already optimized)
 
 3. **Configure Print Settings**

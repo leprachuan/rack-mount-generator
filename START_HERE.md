@@ -1,59 +1,44 @@
 # START HERE - 19" Rack Mount Generator
 
-Welcome to the 19" Rack Mount Generator prototype! This document will get you started in the right direction.
+Welcome to the 19" Rack Mount Generator! This document will get you started in the right direction.
 
 ## 🎯 What Is This?
 
 A complete web application that generates custom 3D-printable mounting brackets for your networking or computing devices in standard 19-inch server racks.
 
 **Input**: Device dimensions (Width × Height × Depth)
-**Output**: Ready-to-print STL files + assembly guide
+**Output**: Ready-to-print STL file (instant browser download)
 
-**Time to print**: 9-18 hours total
+**Time to print**: 4-12 hours depending on settings
 **Cost**: ~$2-5 in filament
 **Result**: Professional-looking rack mount
 
-## ⚡ Quick Start (5 minutes)
+## ⚡ Quick Start (2 minutes)
 
-### Option 1: Automated Startup (Recommended)
-
-**Windows Users**:
-```
-1. Double-click: run.bat
-2. Wait for server to start
-3. Open browser: http://localhost:5000
-```
-
-**Mac/Linux Users**:
-```bash
-chmod +x run.sh
-./run.sh
-```
-
-### Option 2: Manual Startup
+### Option 1: Using uv (Recommended)
 
 ```bash
-# 1. Install Python 3.8+ from python.org
-# 2. In terminal, run:
-python -m venv venv
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# macOS/Linux:
-source venv/bin/activate
+# Run the application
+uv sync
+uv run python app.py
+```
 
-# Windows (Command Prompt):
-venv\Scripts\activate
+Open browser: **http://localhost:5001**
 
-# Windows (PowerShell):
-venv\Scripts\Activate.ps1
+### Option 2: Using pip
 
-# 3. Install dependencies:
+```bash
+# Install Python 3.11+ from python.org
 pip install -r requirements.txt
-
-# 4. Start server:
 python app.py
+```
 
-# 5. Open browser:
-http://localhost:5000
+Open browser: **http://localhost:5001**
+
+> **Note**: Port 5001 is used because 5000 is often blocked on macOS.
 ```
 
 ## 📚 Documentation Guide
@@ -166,11 +151,11 @@ See `ASSEMBLY_GUIDE.md` for detailed instructions.
 ## ❓ Quick Troubleshooting
 
 ### "Python not found"
-- Install Python 3.8+ from [python.org](https://python.org)
+- Install Python 3.11+ from [python.org](https://python.org)
 - Make sure to check "Add Python to PATH"
 
-### "Port 5000 already in use"
-- Close other applications
+### "Port 5001 already in use"
+- Close other applications using that port
 - Or edit `app.py` to use different port
 
 ### "Can't see 3D preview"
@@ -340,7 +325,7 @@ If you're new to 3D printing:
 ## 🎉 Ready?
 
 1. **Run startup script** → `./run.sh` or `run.bat`
-2. **Open browser** → `http://localhost:5000`
+2. **Open browser** → `http://localhost:5001`
 3. **Enter dimensions** → Your device size
 4. **Click Generate** → Done!
 5. **Download files** → Ready to print
@@ -359,9 +344,9 @@ If you're new to 3D printing:
 - Temporary files: System /tmp directory
 
 ### Port & Access
-- Local: http://localhost:5000
-- Network: http://<your-ip>:5000
-- Default port: 5000
+- Local: http://localhost:5001
+- Network: http://<your-ip>:5001
+- Default port: 5001
 
 ## 🏁 Next Steps
 
@@ -423,7 +408,7 @@ Success! 🎉
 run.bat               # Windows
 ```
 
-Then open: **http://localhost:5000**
+Then open: **http://localhost:5001**
 
 ---
 

@@ -1,343 +1,217 @@
-# 19" Rack Mount Generator - Prototype
+# 19" Rack Mount Generator
 
-A web-based tool for generating customized 3D-printable mounting brackets for square devices in standard 19-inch server racks.
+A web-based tool for generating customized 3D-printable mounting brackets for devices in standard 19-inch server racks.
+
+![Preview](https://img.shields.io/badge/3D-Preview-blue) ![STL Export](https://img.shields.io/badge/Export-STL-green) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
 
-✨ **Interactive Web Interface**
-- Real-time 3D preview with Three.js
-- Form-based configuration system
-- Live statistics (volume, weight, print time)
-- Support for multiple printer bed sizes
+✨ **Real-Time 3D Preview**
+- Interactive Three.js visualization
+- Rotate, pan, and zoom to inspect your design
+- Device shown as semi-transparent overlay
 
-🔧 **Intelligent STL Generation**
-- Automatic bracket generation based on device dimensions
-- Configurable tolerance for easy insertion/removal
-- Support post generation for underside mounting
-- Optional 19" rack mounting hole patterns
-- Binary STL output (more efficient than ASCII)
+🔧 **Customizable Parameters**
+- Device dimensions (width, height, depth)
+- Tolerance for easy insertion/removal
+- Wall thickness and structural options
+- Left or right rack ear positioning
 
-📊 **Print Optimization**
-- Configurable infill density (15%-50%)
-- Material and weight estimation
-- Print time calculation
-- Automatic part organization
+📐 **Structural Components**
+- Half-width faceplate (225mm) - fits standard printer beds
+- Rack ear with M6 mounting holes (3 per U)
+- Joining flange with M3 holes to connect two brackets
+- Support shelf with triangular gussets
+- Blank panel mode for solid faceplates
 
-📦 **Output Files**
-- Left and right mounting brackets
-- Front retention clip
-- Support posts (optional)
-- Assembly guide (markdown)
-- Configuration file (JSON)
+📦 **Instant STL Export**
+- What-you-see-is-what-you-get export
+- Binary STL format for efficiency
+- Direct browser download - no server processing
 
-## Installation
+## Quick Start
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip (Python package manager)
+- Python 3.11 or higher
+- [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
 
-### Setup Steps
+### Installation
 
-1. **Clone or extract the project:**
 ```bash
-cd rack_mount_generator
-```
+# Clone the repository
+git clone https://github.com/leprachuan/rack-mount-generator.git
+cd rack-mount-generator
 
-2. **Create virtual environment (recommended):**
-```bash
-python -m venv venv
+# Using uv (recommended)
+uv sync
+uv run python app.py
 
-# On Windows:
-venv\Scripts\activate
-
-# On macOS/Linux:
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
-```bash
+# OR using pip
 pip install -r requirements.txt
-```
-
-## Running the Application
-
-1. **Start the Flask server:**
-```bash
 python app.py
 ```
 
-2. **Open in browser:**
-```
-http://localhost:5000
-```
+### Open in Browser
 
-3. **Enter your device dimensions and click "Generate Mount"**
+Navigate to: **http://localhost:5001**
+
+> **Note**: The app uses port 5001 because port 5000 is often blocked on macOS by AirPlay/ControlCenter.
 
 ## Usage Guide
 
-### Input Parameters
+### Step 1: Enter Device Dimensions
 
-#### Device Dimensions
-- **Width**: The horizontal width of your device (mm)
-- **Height**: The vertical height (typically 44mm for 1U rack devices)
-- **Depth**: How far the device extends into the rack (mm)
+| Field | Description | Example |
+|-------|-------------|---------|
+| Width | Horizontal width of your device | 150mm |
+| Height | Vertical height (44mm = 1U) | 44mm |
+| Depth | How far device extends into rack | 200mm |
 
-#### Mount Settings
-- **Wall Clearance**: Space between device and bracket walls (default: 2mm)
-  - Tight fit: 0.5-1mm
-  - Standard: 2mm (recommended)
-  - Loose fit: 5mm
-- **Wall Thickness**: Thickness of the bracket material (default: 3mm)
-  - Thin: 1.5-2mm (less material, may flex)
-  - Standard: 3mm (recommended)
-  - Thick: 4-5mm (more rigid)
+### Step 2: Configure Mount Settings
 
-#### Printer Configuration
-- **Bed Size**: Select your printer or specify custom dimensions
-  - Prusa i3 MK3S: 250 × 210mm
-  - Ender 3: 220 × 220mm
-  - CR-10: 300 × 300mm
-- **Infill Density**: Material filling percentage
-  - 15%: Light, minimal material, fastest print
-  - 20%: Standard, good strength-to-time ratio
-  - 30%: Strong, good for high-stress applications
-  - 50%: Very strong, maximum durability
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Tolerance | Gap around device for easy insertion | 2mm |
+| Wall Thickness | Faceplate material thickness | 10mm |
+| Shelf Thickness | Support shelf thickness | 5mm |
+| Flange Thickness | Joining flange width | 5mm |
+| Gusset Size | Triangular support size | 15mm |
 
-#### Advanced Options
-- **Support Posts**: Adds posts underneath to prevent sagging
-- **Rack Mounting Holes**: Adds 19" standard hole patterns
+### Step 3: Choose Options
 
-### Output Files
+- **Add Support Shelf**: Creates a shelf below the device opening
+- **Add Rack Holes**: Adds M6 mounting holes to the rack ear
+- **Ear Side**: Position rack ear on left or right
+- **Blank Panel**: Creates solid faceplate (no cutout)
 
-#### bracket_left.stl
-Main mounting bracket for the left side of the device.
-- **Print orientation**: Flat side down
-- **Supports needed**: No
-- **Typical print time**: 4-8 hours (depending on infill)
+### Step 4: Generate & Download
 
-#### bracket_right.stl
-Mirror image of left bracket for the right side.
-- **Print orientation**: Flat side down
-- **Supports needed**: No
-- **Typical print time**: 4-8 hours
+1. Click **"Generate STL Files"**
+2. Preview updates in real-time
+3. STL file downloads automatically
+4. Open in your slicer software (PrusaSlicer, Cura, etc.)
 
-#### retention_clip.stl
-Front-facing clip to secure the device from moving forward.
-- **Print orientation**: Flat side down
-- **Supports needed**: No
-- **Typical print time**: 1-2 hours
+## Printing Recommendations
 
-#### support_posts.stl (optional)
-Underside support posts to prevent flex and sagging.
-- **Print orientation**: Posts pointing down
-- **Supports needed**: No
-- **Typical print time**: 0.5-1 hour
+### Material
+| Material | Best For | Notes |
+|----------|----------|-------|
+| PLA | Prototypes, light loads | Easy to print, may warp in heat |
+| PETG | General use | Good strength, slight flexibility |
+| ABS | High stress | Strongest, requires enclosure |
 
-#### ASSEMBLY_GUIDE.md
-Complete assembly instructions and troubleshooting guide.
+### Print Settings
+- **Layer Height**: 0.2mm (standard) or 0.15mm (detailed)
+- **Infill**: 20-30% for normal use, 50%+ for heavy devices
+- **Walls**: 3-4 perimeters recommended
+- **Supports**: Not needed - designed to print flat
 
-## Assembly Instructions
+### Orientation
+Print with the faceplate flat on the bed (front face down).
 
-### Before Assembly
-1. Print all STL files according to recommendations
-2. Remove support material if any
-3. Sand down any rough edges
-4. Test fit all parts with your actual device
+## Assembly
 
-### Installation Steps
+### Mounting a Single Bracket
+1. Print the bracket with your chosen settings
+2. Insert M6 cage nuts or use clip nuts on rack rails
+3. Slide device into the bracket opening
+4. Secure bracket to rack with M6 bolts
 
-1. **Prepare the brackets**
-   - Inspect for defects
-   - Ensure walls are straight (use a level)
-
-2. **Install left bracket**
-   - Position at desired height on 19" rack
-   - Align with rack rails
-
-3. **Insert device**
-   - Gently slide device into mounting cavity
-   - Use 2mm clearance to guide insertion
-   - Center the device horizontally
-
-4. **Install right bracket**
-   - Slide onto opposite side of device
-   - Ensure both brackets are aligned
-
-5. **Attach retention clip**
-   - Snap clip onto front of device
-   - Tighten for secure mounting
-
-6. **Secure to rack**
-   - Use M6 or 1/4" bolts
-   - Insert through bracket mounting points
-   - Tighten securely (torque spec depends on bolt size)
+### Connecting Two Half-Width Brackets
+1. Print left bracket (ear on left side)
+2. Print right bracket (ear on right side)
+3. Align the joining flanges together
+4. Insert M3 screws through horizontal holes
+5. Secure with M3 nuts
+6. Mount assembled full-width bracket to rack
 
 ## Technical Specifications
 
 ### Rack Standards
-- **Rail spacing**: 482.6mm (19 inches)
-- **Unit height**: 44.45mm (1U = standard server size)
-- **Mounting holes**: #10-32 or M6 standard
+- **Standard**: EIA-310-D
+- **Rail Spacing**: 450mm (inner width)
+- **Unit Height**: 44.45mm (1U)
+- **Mounting Holes**: M6 (6.35mm diameter)
+
+### Generated Bracket Dimensions
+- **Faceplate Width**: 225mm (half-width design)
+- **Rack Ear Width**: 15.875mm (5/8")
+- **Joining Flange Depth**: 50.8mm (2")
+- **M3 Joining Holes**: 3.2mm diameter
+
+### Hole Patterns
+- **Rack Ear**: 3 holes per U at standard positions (6.35mm, 22.225mm, 38.1mm from U bottom)
+- **Joining Flange**: 2 rows of holes (near front and back of flange)
 
 ### Material Recommendations
-- **PLA**: Easy to print, good for prototypes
-- **PETG**: Better strength than PLA
-- **ABS**: Highest strength but harder to print
-
-### Performance
-- **Tolerance accuracy**: ±0.3mm
-- **Maximum device weight**: 5-10kg (depending on infill and material)
-- **Temperature limit**: 60°C (PLA)
+| Material | Best For | Notes |
+|----------|----------|-------|
+| PLA | Prototypes, light loads | Easy to print, 60°C limit |
+| PETG | General use | Good strength, slight flexibility |
+| ABS | High stress | Strongest, requires enclosure |
 
 ## Troubleshooting
 
-### Device too tight to insert
-- Clearance tolerance may be too small
-- Brackets may be warped from printing
-- Solution: Heat brackets gently with hot water for ~2 minutes to soften, then test fit
+### Device Too Tight
+- Increase tolerance (try 3-4mm)
+- Check for warping during print
+- Sand edges if needed
 
-### Device moves side-to-side
-- Wall clearance may be too large
-- Check that walls are straight
-- Solution: Increase infill, reprint with thicker walls, or add friction pads
+### Bracket Flexes Under Load
+- Increase wall thickness
+- Use higher infill percentage
+- Switch to PETG or ABS material
+- Add support shelf option
 
-### Device falls out
-- Retention clip may be too loose
-- Bracket may not be fully seated in rack
-- Solution: Tighten clip, ensure brackets are level
+### Holes Don't Align with Rack
+- Verify your rack follows EIA-310-D standard
+- Some racks use #10-32 instead of M6 - holes should still work
 
-### Bracket is cracking
-- Infill too low for heavy devices
-- Material incompatibility
-- Solution: Reprint with higher infill (30%+)
+### Preview Doesn't Update
+- Refresh the browser page
+- Check browser console for JavaScript errors
+- Ensure all input values are valid numbers
 
-## API Reference
-
-### Generate Mount
-**POST** `/api/generate`
-
-Request body:
-```json
-{
-  "width": 100,
-  "height": 44,
-  "depth": 200,
-  "tolerance": 2,
-  "wallThickness": 3,
-  "addSupport": true,
-  "addRackHoles": false,
-  "infill": 20,
-  "bedSize": "prusa"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "job_id": "20240115_143025",
-  "files": [
-    {
-      "name": "bracket_left.stl",
-      "size_mb": 2.4,
-      "triangles": 8524,
-      "material_cm3": 15.3,
-      "weight_g": 18.9,
-      "print_time_h": 4.2
-    }
-  ],
-  "stats": {
-    "total_weight_g": 45.2,
-    "total_time_h": 12.4,
-    "total_parts": 3
-  }
-}
-```
-
-### Download File
-**GET** `/api/download/<job_id>/<filename>`
-
-### Download All as ZIP
-**GET** `/api/download-zip/<job_id>`
-
-### Health Check
-**GET** `/api/health`
-
-## File Structure
+## Project Structure
 
 ```
 rack_mount_generator/
-├── index.html              # Web interface
-├── app.py                  # Flask server
-├── stl_generator.py        # STL generation engine
-├── requirements.txt        # Python dependencies
-├── README.md              # This file
-└── DEVELOPMENT.md         # Development guide
+├── index.html          # Web interface with Three.js preview & STL export
+├── app.py              # Flask server (serves static files)
+├── stl_generator.py    # Legacy Python STL generator (unused)
+├── requirements.txt    # Python dependencies
+├── pyproject.toml      # uv/pip project configuration
+├── README.md           # This file
+├── ARCHITECTURE.md     # Technical architecture details
+├── DEVELOPMENT.md      # Development guide
+├── AGENTS.md           # AI agent instructions
+└── CLAUDE.md           # Claude-specific implementation notes
 ```
 
 ## Development
 
-### Extending the Generator
+See [DEVELOPMENT.md](DEVELOPMENT.md) for development setup and contribution guidelines.
 
-To add new bracket types:
+See [ARCHITECTURE.md](ARCHITECTURE.md) for technical architecture details.
 
-1. Add a new method to `RackMountGenerator` class
-2. Add entry to `generate_all_parts()` return dictionary
-3. Update `app.py` to include new part type
+## AI Agent Instructions
 
-Example:
-```python
-def create_custom_bracket(self):
-    triangles = []
-    # Your geometry here
-    return np.array(triangles)
-```
+See [AGENTS.md](AGENTS.md) for instructions on working with this codebase.
 
-### Adding Printer Presets
-
-Edit `app.py` to add new bed sizes:
-```python
-BED_SIZES = {
-    'my_printer': {'width': 300, 'depth': 300}
-}
-```
-
-## Limitations & Future Improvements
-
-### Current Limitations
-- ✓ Supports rectangular/square devices only
-- ✓ Single-layer wall construction
-- ✓ Limited to front-face mounting
-
-### Planned Features
-- Circular/cylindrical device support
-- Advanced constraint resolution
-- Multi-material support
-- Automatic part splitting for large prints
-- STEP file export
-- Real-time part collision detection
-- Web-based slicer integration
+See [CLAUDE.md](CLAUDE.md) for Claude-specific implementation details.
 
 ## License
 
-This prototype is provided as-is for educational and personal use.
-
-## Support & Feedback
-
-For issues or feature requests, please document:
-1. Device dimensions that caused the issue
-2. Printer model being used
-3. Expected vs actual output
-4. Error messages (if any)
+MIT License - See LICENSE file for details.
 
 ## Acknowledgments
 
-- Built with [Three.js](https://threejs.org/) for 3D visualization
-- Uses [Flask](https://flask.palletsprojects.com/) web framework
-- Generated files compatible with all major slicing software
+- [Three.js](https://threejs.org/) for 3D visualization and STL export
+- [Flask](https://flask.palletsprojects.com/) for the web server
+- The 3D printing community for dimension standards
 
 ---
 
-**Version**: 1.0.0
-**Last Updated**: January 2024
-**Status**: Prototype - Production Ready
+**Version**: 2.0.0  
+**Last Updated**: January 2025  
+**Status**: Production Ready - Client-side STL Export

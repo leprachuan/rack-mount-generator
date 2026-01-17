@@ -1,6 +1,8 @@
 # Architecture Guide - 19" Rack Mount Generator
 
-## System Architecture
+## System Architecture (v2.0)
+
+**Important**: As of v2.0, STL generation happens **entirely client-side** using Three.js and the STLExporter library. The Python backend only serves static files.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -10,25 +12,25 @@
 │  │              Web Browser (Client)                     │   │
 │  │                                                       │   │
 │  │  ┌─────────────────────────────────────────────┐    │   │
-│  │  │  index.html                                 │    │   │
+│  │  │  index.html - COMPLETE APPLICATION          │    │   │
 │  │  │  ├─ HTML Form (Input Controls)             │    │   │
 │  │  │  ├─ Three.js Scene (3D Preview)            │    │   │
+│  │  │  ├─ THREE.STLExporter (STL Generation)     │    │   │
 │  │  │  ├─ CSS Styling (Responsive Design)        │    │   │
-│  │  │  └─ JavaScript (Form Handling, API Calls)  │    │   │
+│  │  │  └─ JavaScript (Geometry, Export, UI)      │    │   │
 │  │  └─────────────────────────────────────────────┘    │   │
-│  │                      ↓                                │   │
-│  │  ┌─────────────────────────────────────────────┐    │   │
-│  │  │  HTTPS/HTTP Communication                   │    │   │
-│  │  │  ├─ POST /api/generate                      │    │   │
-│  │  │  ├─ GET /api/download/<job_id>/<file>     │    │   │
-│  │  │  ├─ GET /api/download-zip/<job_id>        │    │   │
-│  │  │  └─ GET /api/health                        │    │   │
-│  │  └─────────────────────────────────────────────┘    │   │
+│  │                                                       │   │
+│  │  Flow:                                                │   │
+│  │  1. User enters dimensions in form                   │   │
+│  │  2. JavaScript creates Three.js geometry             │   │
+│  │  3. Preview updates in real-time                     │   │
+│  │  4. Click "Generate" → STLExporter → Download        │   │
+│  │                                                       │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                      ↑                                       │
 └──────────────────────┼───────────────────────────────────────┘
-                       │ Network
-                       │ (localhost:5000 or remote)
+                       │ Static Files Only
+                       │ (localhost:5001)
                        │
 ┌──────────────────────┴───────────────────────────────────────┐
 │                  Flask Web Server (Backend)                  │
@@ -40,64 +42,21 @@
 │  │  │  ├─ @app.route('/')                              │   │
 │  │  │  │  └─ Serves index.html                         │   │
 │  │  │  │                                                │   │
-│  │  │  ├─ @app.route('/api/generate', POST)           │   │
-│  │  │  │  ├─ Parse form data                           │   │
-│  │  │  │  ├─ Validate input                            │   │
-│  │  │  │  ├─ Call STL Generator                        │   │
-│  │  │  │  ├─ Write files to disk                       │   │
-│  │  │  │  └─ Return job info                           │   │
-│  │  │  │                                                │   │
-│  │  │  ├─ @app.route('/api/download/...', GET)       │   │
-│  │  │  │  └─ Stream file to client                     │   │
-│  │  │  │                                                │   │
-│  │  │  └─ ... other routes ...                         │   │
+│  │  │  └─ Legacy API routes (unused, may be removed)  │   │
 │  │  │                                                   │   │
-│  │  ├─ Error Handlers:                                 │   │
-│  │  │  ├─ 404 Not Found                                │   │
-│  │  │  └─ 500 Server Error                             │   │
-│  │  │                                                   │   │
-│  │  └─ Utilities:                                      │   │
-│  │     ├─ cleanup_old_jobs()                           │   │
-│  │     └─ CORS Configuration                           │   │
+│  │  └─ Note: Port 5001 (5000 blocked on macOS)        │   │
 │  └──────────────────────────────────────────────────────┘   │
-│                      ↓                                       │
+│                                                               │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  stl_generator.py (STL Generation Engine)            │   │
+│  │  stl_generator.py (LEGACY - NOT USED)                │   │
 │  │                                                       │   │
-│  │  ├─ RackMountGenerator Class:                        │   │
-│  │  │  ├─ __init__(width, height, depth, ...)         │   │
-│  │  │  ├─ create_bracket(side='left'|'right')         │   │
-│  │  │  │  ├─ Define front/back vertices               │   │
-│  │  │  │  ├─ Create inner cavity                       │   │
-│  │  │  │  ├─ Generate triangle faces                   │   │
-│  │  │  │  ├─ Connect all faces                         │   │
-│  │  │  │  └─ Return triangle array                     │   │
-│  │  │  │                                                │   │
-│  │  │  ├─ create_retention_clip()                      │   │
-│  │  │  ├─ create_support_posts()                       │   │
-│  │  │  └─ generate_all_parts()                         │   │
-│  │  │                                                   │   │
-│  │  ├─ STLWriter Class:                                │   │
-│  │  │  ├─ write_stl() - ASCII format                   │   │
-│  │  │  └─ write_binary_stl() - Binary format           │   │
-│  │  │                                                   │   │
-│  │  ├─ calculate_print_stats()                         │   │
-│  │  │  └─ Returns: volume, weight, print_time         │   │
-│  │  │                                                   │   │
-│  │  └─ generate_assembly_guide()                       │   │
-│  │     └─ Outputs: ASSEMBLY_GUIDE.md                   │   │
+│  │  This file remains for reference but STL generation  │   │
+│  │  now happens entirely in the browser via Three.js.   │   │
+│  │  The Python generator had issues with:               │   │
+│  │  - Flange gusset orientation (winding order)        │   │
+│  │  - Rack holes not subtracting properly              │   │
 │  │                                                       │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                      ↓                                       │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  File System (Temporary Storage)                     │   │
-│  │                                                       │   │
-│  │  /tmp/rack_mounts/                                   │   │
-│  │  └─ mount_20240115_143025/                           │   │
-│  │     ├─ bracket_left.stl                             │   │
-│  │     ├─ bracket_right.stl                            │   │
-│  │     ├─ retention_clip.stl                           │   │
-│  │     ├─ support_posts.stl                            │   │
+│  │  The client-side approach provides WYSIWYG export.   │   │
 │  │     ├─ ASSEMBLY_GUIDE.md                            │   │
 │  │     └─ config.json                                  │   │
 │  │                                                       │   │
@@ -123,47 +82,55 @@ RackMountGenerator.generate_all_parts()
     ├─ create_retention_clip()
     └─ create_support_posts()
     ↓
-STLWriter.write_binary_stl() ×4
+```
+
+## Generation Flow (v2.0 - Client-Side)
+
+```
+User enters dimensions
     ↓
-generate_assembly_guide()
+JavaScript reads form values
     ↓
-Save config.json
+updatePreview() called
     ↓
-Return job_id + file_info
+Three.js geometry created:
+├─ createFaceplate()
+├─ createRackEar() with Shape.holes
+├─ createShelf()
+├─ createGussets()
+└─ createJoiningFlange()
     ↓
-Display download buttons
+Scene rendered (preview visible)
     ↓
-User clicks download
+User clicks "Generate STL Files"
     ↓
-GET /api/download/<job_id>/<file>
+downloadSTLFromPreview() called
     ↓
-Stream file to browser
+THREE.STLExporter.parse(scene)
     ↓
-Save STL to computer
+Binary STL Blob created
+    ↓
+Browser downloads file
 ```
 
 ## Module Dependencies
 
 ```
-Frontend Dependencies:
+Frontend Dependencies (ALL IN index.html):
 ├─ Three.js (r128) - 3D rendering
 │  └─ WebGL 2.0
+├─ THREE.OrbitControls - Camera control
+├─ THREE.STLExporter - STL file generation
 └─ Built-in Browser APIs
-   ├─ Fetch API
-   ├─ FormData
-   └─ Canvas/WebGL
+   ├─ Blob
+   └─ URL.createObjectURL
 
-Backend Dependencies:
+Backend Dependencies (MINIMAL):
 ├─ Flask (3.0.0) - Web framework
-├─ Flask-CORS (4.0.0) - CORS support
-├─ NumPy (1.24.3) - Numerical operations
-├─ Werkzeug (3.0.1) - WSGI utilities
 └─ Python standard library
-   ├─ os (file operations)
-   ├─ json (config storage)
-   ├─ tempfile (temporary files)
-   ├─ shutil (directory operations)
-   └─ zipfile (archive creation)
+   └─ (only for serving static files)
+
+Note: NumPy, Flask-CORS no longer required for core functionality.
 ```
 
 ## File Structure
@@ -172,23 +139,18 @@ Backend Dependencies:
 rack_mount_generator/
 │
 ├── Frontend Files
-│   └─ index.html ........................ Main web interface
-│      ├─ Form elements
+│   └─ index.html ........................ COMPLETE APPLICATION
+│      ├─ Form elements (UI)
 │      ├─ Three.js scene setup
-│      ├─ Real-time preview rendering
-│      └─ API communication
+│      ├─ Geometry creation functions
+│      ├─ STLExporter integration
+│      └─ Download handling
 │
 ├── Backend Files
 │   ├─ app.py ........................... Flask server
-│   │  ├─ Route handlers
-│   │  ├─ API endpoints
-│   │  ├─ File management
-│   │  └─ Job cleanup
+│   │  └─ Serves index.html (that's it!)
 │   │
-│   └─ stl_generator.py ................. STL generation
-│      ├─ RackMountGenerator class
-│      ├─ Geometry algorithms
-│      ├─ STLWriter class
+│   └─ stl_generator.py ................. LEGACY (unused)
 │      └─ Statistics calculation
 │
 ├── Configuration & Setup

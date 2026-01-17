@@ -353,6 +353,14 @@
                 </div>
 
                 <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="isBlank">
+                        <label for="isBlank" style="margin-bottom: 0;">Blank Panel (no cutout)</label>
+                    </div>
+                    <div class="input-label" style="margin-top: 8px;">Creates a solid faceplate with no device opening or shelf</div>
+                </div>
+
+                <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="addRackHoles" checked>
                         Add Rack Mounting Holes
@@ -402,6 +410,24 @@
                 <!-- Advanced Options -->
                 <div class="divider"></div>
                 <div class="section-title">Advanced Options</div>
+
+                <div class="form-group">
+                    <label>Component Thicknesses (mm)</label>
+                    <div class="input-row">
+                        <div>
+                            <input type="number" id="shelfThickness" value="5" min="3" max="15" step="1">
+                            <div class="input-label">Shelf</div>
+                        </div>
+                        <div>
+                            <input type="number" id="flangeThickness" value="5" min="3" max="15" step="1">
+                            <div class="input-label">Flange</div>
+                        </div>
+                        <div>
+                            <input type="number" id="gussetSize" value="15" min="5" max="30" step="1">
+                            <div class="input-label">Gussets</div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="form-group">
                     <div class="checkbox-group">
@@ -472,6 +498,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
     <script>
         // THREE.JS Scene Setup
         let scene, camera, renderer, controls, mountMesh, supportMesh;
@@ -517,7 +544,7 @@
 
         // Generate Mount Bracket Geometry
         // This creates a preview that matches the STL generator output
-        function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport) {
+        function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize) {
             const group = new THREE.Group();
             
             // Constants matching STL generator
@@ -526,8 +553,9 @@
             const DEVICE_HEIGHT_PER_U = 35.0; // Max device height per rack unit (leaves room for tolerance)
             const EAR_WIDTH = 15.875; // Standard rack ear width
             
-            // Get ear side from form
+            // Get settings from form
             const earSide = document.getElementById('earSide').value;
+            const isBlank = document.getElementById('isBlank').checked;
             
             // Calculate dimensions
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
@@ -548,47 +576,55 @@
             const shelfMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
             const earMat = new THREE.MeshPhongMaterial({ color: 0x4CAF50 });
             
-            // Create faceplate with hole using CSG-like approach with BoxGeometry pieces
-            // Since Three.js doesn't have native CSG, we'll build it from pieces
-            
-            // Bottom section (below opening)
-            if (openingY > 0) {
-                const bottomGeom = new THREE.BoxGeometry(faceplateWidth, openingY, faceplateThickness);
-                const bottomMesh = new THREE.Mesh(bottomGeom, bracketMat);
-                bottomMesh.position.set(faceplateWidth/2, openingY/2, -faceplateThickness/2);
-                group.add(bottomMesh);
-            }
-            
-            // Top section (above opening)
-            const topHeight = faceplateHeight - openingY - openingHeight;
-            if (topHeight > 0) {
-                const topGeom = new THREE.BoxGeometry(faceplateWidth, topHeight, faceplateThickness);
-                const topMesh = new THREE.Mesh(topGeom, bracketMat);
-                topMesh.position.set(faceplateWidth/2, openingY + openingHeight + topHeight/2, -faceplateThickness/2);
-                group.add(topMesh);
-            }
-            
-            // Left section (beside opening)
-            if (openingX > 0) {
-                const leftGeom = new THREE.BoxGeometry(openingX, openingHeight, faceplateThickness);
-                const leftMesh = new THREE.Mesh(leftGeom, bracketMat);
-                leftMesh.position.set(openingX/2, openingY + openingHeight/2, -faceplateThickness/2);
-                group.add(leftMesh);
-            }
-            
-            // Right section (beside opening)
-            const rightWidth = faceplateWidth - openingX - openingWidth;
-            if (rightWidth > 0) {
-                const rightGeom = new THREE.BoxGeometry(rightWidth, openingHeight, faceplateThickness);
-                const rightMesh = new THREE.Mesh(rightGeom, bracketMat);
-                rightMesh.position.set(openingX + openingWidth + rightWidth/2, openingY + openingHeight/2, -faceplateThickness/2);
-                group.add(rightMesh);
+            // BLANK PANEL - solid faceplate
+            if (isBlank) {
+                const blankGeom = new THREE.BoxGeometry(faceplateWidth, faceplateHeight, faceplateThickness);
+                const blankMesh = new THREE.Mesh(blankGeom, bracketMat);
+                blankMesh.position.set(faceplateWidth/2, faceplateHeight/2, -faceplateThickness/2);
+                group.add(blankMesh);
+            } else {
+                // Create faceplate with hole using CSG-like approach with BoxGeometry pieces
+                // Since Three.js doesn't have native CSG, we'll build it from pieces
+                
+                // Bottom section (below opening)
+                if (openingY > 0) {
+                    const bottomGeom = new THREE.BoxGeometry(faceplateWidth, openingY, faceplateThickness);
+                    const bottomMesh = new THREE.Mesh(bottomGeom, bracketMat);
+                    bottomMesh.position.set(faceplateWidth/2, openingY/2, -faceplateThickness/2);
+                    group.add(bottomMesh);
+                }
+                
+                // Top section (above opening)
+                const topHeight = faceplateHeight - openingY - openingHeight;
+                if (topHeight > 0) {
+                    const topGeom = new THREE.BoxGeometry(faceplateWidth, topHeight, faceplateThickness);
+                    const topMesh = new THREE.Mesh(topGeom, bracketMat);
+                    topMesh.position.set(faceplateWidth/2, openingY + openingHeight + topHeight/2, -faceplateThickness/2);
+                    group.add(topMesh);
+                }
+                
+                // Left section (beside opening)
+                if (openingX > 0) {
+                    const leftGeom = new THREE.BoxGeometry(openingX, openingHeight, faceplateThickness);
+                    const leftMesh = new THREE.Mesh(leftGeom, bracketMat);
+                    leftMesh.position.set(openingX/2, openingY + openingHeight/2, -faceplateThickness/2);
+                    group.add(leftMesh);
+                }
+                
+                // Right section (beside opening)
+                const rightWidth = faceplateWidth - openingX - openingWidth;
+                if (rightWidth > 0) {
+                    const rightGeom = new THREE.BoxGeometry(rightWidth, openingHeight, faceplateThickness);
+                    const rightMesh = new THREE.Mesh(rightGeom, bracketMat);
+                    rightMesh.position.set(openingX + openingWidth + rightWidth/2, openingY + openingHeight/2, -faceplateThickness/2);
+                    group.add(rightMesh);
+                }
             }
             
             // Support shelf (extends back from bottom of opening)
             // Shelf is wider than opening with triangular gussets for strength
-            if (addSupport) {
-                const shelfThickness = 5; // mm
+            // Only add support if not a blank panel
+            if (addSupport && !isBlank) {
                 const shelfDepth = depth + 10; // Extends 10mm past device
                 const gussetWidth = 15; // Extra width on each side for gussets
                 
@@ -642,52 +678,79 @@
                 group.add(rightGusset);
             }
             
-            // Rack ear (mounting flange)
-            const earGeom = new THREE.BoxGeometry(EAR_WIDTH, faceplateHeight, faceplateThickness);
-            const earMesh = new THREE.Mesh(earGeom, earMat);
-            if (earSide === 'left') {
-                earMesh.position.set(-EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
-            } else {
-                earMesh.position.set(faceplateWidth + EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
-            }
-            group.add(earMesh);
-            
-            // Rack mounting holes (on the ear)
+            // Rack ear (mounting flange) - built with holes if needed
             const addRackHoles = document.getElementById('addRackHoles').checked;
+            
             if (addRackHoles) {
+                // Build ear with holes using BufferGeometry
+                // We'll create the ear as a series of segments between holes
                 const holeRadius = 3.175; // M6 hole radius (6.35mm / 2)
-                const holeMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+                const holeSegments = 24;
                 
                 // Calculate hole X position (center of ear)
                 let holeX;
+                let earXStart, earXEnd;
                 if (earSide === 'left') {
                     holeX = -EAR_WIDTH / 2;
+                    earXStart = -EAR_WIDTH;
+                    earXEnd = 0;
                 } else {
                     holeX = faceplateWidth + EAR_WIDTH / 2;
+                    earXStart = faceplateWidth;
+                    earXEnd = faceplateWidth + EAR_WIDTH;
                 }
                 
-                // 3 holes per rack unit
+                // Collect all hole Y positions
+                const holePositions = [];
                 for (let u = 0; u < rackUnits; u++) {
                     const baseY = u * RACK_UNIT_HEIGHT;
-                    const holePositionsY = [
-                        baseY + 6.35,    // First hole
-                        baseY + 22.225,  // Middle hole
-                        baseY + 38.1     // Third hole
-                    ];
-                    
-                    holePositionsY.forEach(holeY => {
-                        const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, faceplateThickness + 1, 16);
-                        const holeMesh = new THREE.Mesh(holeGeom, holeMat);
-                        holeMesh.rotation.x = Math.PI / 2;
-                        holeMesh.position.set(holeX, holeY, -faceplateThickness/2);
-                        group.add(holeMesh);
-                    });
+                    holePositions.push(baseY + 6.35);
+                    holePositions.push(baseY + 22.225);
+                    holePositions.push(baseY + 38.1);
                 }
+                
+                // Create ear geometry with holes using shape extrusion
+                const earShape = new THREE.Shape();
+                
+                // Outer rectangle of ear
+                earShape.moveTo(earXStart, 0);
+                earShape.lineTo(earXEnd, 0);
+                earShape.lineTo(earXEnd, faceplateHeight);
+                earShape.lineTo(earXStart, faceplateHeight);
+                earShape.lineTo(earXStart, 0);
+                
+                // Add circular holes
+                holePositions.forEach(holeY => {
+                    const holePath = new THREE.Path();
+                    holePath.absarc(holeX, holeY, holeRadius, 0, Math.PI * 2, true);
+                    earShape.holes.push(holePath);
+                });
+                
+                const extrudeSettings = {
+                    steps: 1,
+                    depth: faceplateThickness,
+                    bevelEnabled: false
+                };
+                
+                const earGeom = new THREE.ExtrudeGeometry(earShape, extrudeSettings);
+                const earMesh = new THREE.Mesh(earGeom, earMat);
+                earMesh.position.set(0, 0, -faceplateThickness);
+                group.add(earMesh);
+            } else {
+                // Simple ear without holes
+                const earGeom = new THREE.BoxGeometry(EAR_WIDTH, faceplateHeight, faceplateThickness);
+                const earMesh = new THREE.Mesh(earGeom, earMat);
+                if (earSide === 'left') {
+                    earMesh.position.set(-EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+                } else {
+                    earMesh.position.set(faceplateWidth + EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+                }
+                group.add(earMesh);
             }
             
             // Joining flange (on inner edge, opposite from ear)
             // This flange extends back into the rack and has M3 holes for connecting brackets
-            const flangeWidth = 5;  // mm (thin for short M3 screws)
+            const flangeWidth = flangeThickness;  // mm (thin for short M3 screws)
             const flangeDepth = 50.8;  // 2 inches
             const flangeMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Purple
             
@@ -741,8 +804,8 @@
             }
             
             // Flange gussets (right-angle triangular supports connecting faceplate back to flange)
-            const gussetHeight = 15;  // Height up the faceplate back (Y)
-            const gussetDepth = 15;   // Depth along the flange (Z)
+            const gussetHeight = gussetSize;  // Height up the faceplate back (Y)
+            const gussetDepth = gussetSize;   // Depth along the flange (Z)
             const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Same purple as flange
             
             // Create gusset shape (right triangle in Y-Z plane)
@@ -761,13 +824,13 @@
             
             const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, gussetExtrudeSettings);
             
-            // Bottom gusset
+            // Bottom gusset (lifted 10mm from bottom)
             const bottomGusset = new THREE.Mesh(gussetGeom, gussetMat);
             bottomGusset.rotation.x = -Math.PI / 2;  // Rotate to Y-Z plane
             if (earSide === 'left') {
-                bottomGusset.position.set(faceplateWidth - flangeWidth, 0, -faceplateThickness);
+                bottomGusset.position.set(faceplateWidth - flangeWidth, 10, -faceplateThickness);
             } else {
-                bottomGusset.position.set(0, 0, -faceplateThickness);
+                bottomGusset.position.set(0, 10, -faceplateThickness);
             }
             group.add(bottomGusset);
             
@@ -794,6 +857,9 @@
             const depth = parseFloat(document.getElementById('deviceDepth').value);
             const tolerance = parseFloat(document.getElementById('tolerance').value);
             const wallThickness = parseFloat(document.getElementById('wallThickness').value);
+            const shelfThickness = parseFloat(document.getElementById('shelfThickness').value);
+            const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
+            const gussetSize = parseFloat(document.getElementById('gussetSize').value);
             const addSupport = document.getElementById('addSupport').checked;
 
             // Remove old mesh
@@ -801,7 +867,7 @@
             if (supportMesh) scene.remove(supportMesh);
 
             // Generate geometry (returns a group)
-            mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport);
+            mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize);
             scene.add(mountMesh);
 
             // Remove old device mesh if exists
@@ -838,15 +904,14 @@
             scene.add(deviceMesh);
 
             // Calculate stats
-            calculateStats(width, height, depth, tolerance, wallThickness);
+            calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness);
         }
 
-        function calculateStats(width, height, depth, tolerance, wallThickness) {
+        function calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness) {
             // Constants
             const RACK_HALF_WIDTH = 225.0;
             const RACK_UNIT_HEIGHT = 44.45;
             const DEVICE_HEIGHT_PER_U = 35.0;
-            const SHELF_THICKNESS = 5;
             
             // Calculate dimensions
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
@@ -860,7 +925,7 @@
             
             // Shelf volume
             const shelfDepth = depth + 10;
-            const shelfVolume = openingWidth * SHELF_THICKNESS * shelfDepth;
+            const shelfVolume = openingWidth * shelfThickness * shelfDepth;
             
             // Total volume in cm³
             const totalVolume = (faceplateVolume + shelfVolume) / 1000;
@@ -878,54 +943,85 @@
             document.getElementById('timeValue').textContent = printHours.toFixed(1) + 'h';
         }
 
+        // Export STL from Three.js scene
+        function exportSTL() {
+            if (!mountMesh) {
+                alert('No geometry to export. Please configure your mount first.');
+                return null;
+            }
+            
+            const exporter = new THREE.STLExporter();
+            
+            // Create a temporary group with the geometry in the correct position
+            const exportGroup = new THREE.Group();
+            
+            // Clone the mount mesh and reset its position for export
+            // The preview centers the model, but we want origin at corner for printing
+            mountMesh.traverse((child) => {
+                if (child.isMesh) {
+                    const clonedMesh = child.clone();
+                    // Apply the parent's transformations
+                    clonedMesh.applyMatrix4(mountMesh.matrixWorld);
+                    exportGroup.add(clonedMesh);
+                }
+            });
+            
+            // Generate binary STL
+            const stlBinary = exporter.parse(exportGroup, { binary: true });
+            return stlBinary;
+        }
+        
+        function downloadSTLFromPreview() {
+            const stlData = exportSTL();
+            if (!stlData) return;
+            
+            // Create download link
+            const blob = new Blob([stlData], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'rack_mount_bracket.stl';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
         // Form Handling
         document.getElementById('mountForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            const formData = {
-                width: parseFloat(document.getElementById('deviceWidth').value),
-                height: parseFloat(document.getElementById('deviceHeight').value),
-                depth: parseFloat(document.getElementById('deviceDepth').value),
-                tolerance: parseFloat(document.getElementById('tolerance').value),
-                wallThickness: parseFloat(document.getElementById('wallThickness').value),
-                addSupport: document.getElementById('addSupport').checked,
-                addRackHoles: document.getElementById('addRackHoles').checked,
-                earSide: document.getElementById('earSide').value,
-                infill: document.getElementById('infill').value,
-                bedSize: document.getElementById('bedSize').value
-            };
 
             const statusDiv = document.getElementById('statusMessage');
             
             try {
                 // Show loading state
-                statusDiv.innerHTML = '<p style="color: #667eea;">⏳ Generating mount...</p>';
+                statusDiv.innerHTML = '<p style="color: #667eea;">⏳ Generating STL from preview...</p>';
                 
-                // Call backend API
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Generation failed');
-                }
-
-                const result = await response.json();
+                // Short delay to show the message
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Export directly from Three.js
+                downloadSTLFromPreview();
                 
                 // Display success message
-                statusDiv.innerHTML = `<p class="success">✓ Mount generated successfully! Job ID: ${result.job_id}</p>`;
+                statusDiv.innerHTML = `<p class="success">✓ STL exported successfully!</p>`;
                 
-                // Display generated files
-                displayGeneratedFiles(result.job_id, result.files, result.stats);
+                // Show a simple file info display
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = `
+                    <div class="file-item">
+                        <div>
+                            <div class="file-name">📄 rack_mount_bracket.stl</div>
+                            <div class="file-size">Exported from preview</div>
+                        </div>
+                        <button class="btn-download" onclick="downloadSTLFromPreview()">⬇ Download Again</button>
+                    </div>
+                `;
+                document.getElementById('filesContainer').style.display = 'block';
                 
             } catch (error) {
                 statusDiv.innerHTML = `<p class="error">✗ Error: ${error.message}</p>`;
-                console.error('Generation error:', error);
+                console.error('Export error:', error);
             }
         });
 
@@ -1033,13 +1129,14 @@
         });
 
         // Input listeners for live preview
-        ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'infill'].forEach(id => {
+        ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'shelfThickness', 'flangeThickness', 'gussetSize', 'infill'].forEach(id => {
             document.getElementById(id).addEventListener('input', updatePreview);
         });
 
         document.getElementById('addSupport').addEventListener('change', updatePreview);
         document.getElementById('earSide').addEventListener('change', updatePreview);
         document.getElementById('addRackHoles').addEventListener('change', updatePreview);
+        document.getElementById('isBlank').addEventListener('change', updatePreview);
 
         // Initialize
         window.addEventListener('load', () => {

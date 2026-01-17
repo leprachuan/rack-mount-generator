@@ -2,11 +2,12 @@
 
 ## Executive Summary
 
-A complete, production-ready prototype for generating customized 3D-printable mounting brackets for square devices in 19-inch server racks.
+A complete, production-ready web application for generating customized 3D-printable mounting brackets for devices in 19-inch server racks.
 
 **Status**: ✅ COMPLETE
-**Version**: 1.0.0
+**Version**: 2.0.0
 **Quality**: Production Ready
+**Export**: Client-side (Three.js + STLExporter)
 
 ---
 
@@ -14,40 +15,32 @@ A complete, production-ready prototype for generating customized 3D-printable mo
 
 ### Core Application Files
 
-#### 1. **index.html** (Main Web Interface)
-- **Purpose**: User-facing web application
-- **Size**: ~15 KB
+#### 1. **index.html** (Complete Application)
+- **Purpose**: Full web application - UI, 3D preview, AND STL export
+- **Size**: ~25 KB
 - **Features**:
-  - Interactive form with 8+ input parameters
+  - Interactive form with configurable parameters
   - Real-time 3D preview using Three.js
-  - Live statistics calculation (volume, weight, print time)
-  - Responsive design (desktop/tablet)
-  - Download management interface
+  - **Client-side STL export via THREE.STLExporter**
+  - Proper hole cutouts using THREE.Shape.holes
+  - Responsive design
 - **Technology**: HTML5, CSS3, Vanilla JavaScript, Three.js r128
 - **Browser Support**: Chrome, Firefox, Safari, Edge
 
 #### 2. **app.py** (Flask Backend Server)
-- **Purpose**: RESTful API server and request handler
+- **Purpose**: Static file server
 - **Size**: ~8 KB
 - **Features**:
-  - 5 main API endpoints
-  - Job-based file management
-  - CORS support for cross-origin requests
-  - Automatic job cleanup (24-hour retention)
-  - Error handling and validation
-- **Technology**: Flask 3.0.0, Python 3.8+
-- **Performance**: <1 second response time
+  - Serves index.html
+  - Port 5001 (avoids macOS conflicts)
+  - Legacy API endpoints (unused)
+- **Technology**: Flask 3.0.0, Python 3.11+
 
-#### 3. **stl_generator.py** (STL Generation Engine)
-- **Purpose**: Parametric geometry generation and STL output
-- **Size**: ~12 KB
-- **Classes**:
-  - `RackMountGenerator`: Main geometry generator
-  - `STLWriter`: Binary STL file writer
-- **Functions**:
-  - `calculate_print_stats()`: Estimate print parameters
-  - `generate_assembly_guide()`: Create documentation
-- **Output Format**: Binary STL (efficient)
+#### 3. **stl_generator.py** (LEGACY - Not Used)
+- **Purpose**: Original Python STL generator
+- **Status**: Kept for reference only
+- **Note**: Replaced by client-side Three.js export
+- **Issues**: Had problems with gusset orientation and hole subtraction
 - **Capabilities**:
   - Bracket generation (left/right)
   - Retention clip creation

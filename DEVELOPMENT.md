@@ -1,84 +1,93 @@
 # Development Guide - 19" Rack Mount Generator
 
-## Architecture Overview
+## Architecture Overview (v2.0)
 
-### Frontend (index.html)
-- **Framework**: Vanilla JavaScript + Three.js
+> **Important**: As of v2.0, STL generation is entirely client-side using Three.js and STLExporter. The Python backend only serves static files.
+
+### Frontend (index.html) - THE COMPLETE APPLICATION
+- **Framework**: Vanilla JavaScript + Three.js r128
+- **STL Export**: THREE.STLExporter (client-side)
 - **Features**:
   - Real-time 3D visualization using Three.js
   - OrbitControls for interactive viewing
-  - Form validation and real-time calculations
-  - Responsive design with CSS Grid
+  - Form validation
+  - Direct STL export from Three.js scene
+  - No server round-trip for generation
 
-### Backend (app.py)
-- **Framework**: Flask + Flask-CORS
+### Backend (app.py) - MINIMAL
+- **Framework**: Flask 3.0
 - **Features**:
-  - RESTful API endpoints
-  - File management system
-  - Job tracking with timestamps
-  - Automatic cleanup of old files
+  - Serves index.html
+  - Port 5001 (5000 blocked on macOS)
+  - Legacy API endpoints (unused)
 
-### STL Engine (stl_generator.py)
-- **Core Logic**: Parametric geometry generation
-- **Output**: Binary STL format
-- **Features**:
-  - Customizable bracket generation
-  - Support post creation
-  - Print statistics calculation
-  - Assembly documentation generation
+### STL Engine (stl_generator.py) - LEGACY
+- **Status**: NOT USED for production
+- **Note**: Kept for reference; had issues with gusset orientation and hole subtraction
+- **Replacement**: Client-side Three.js geometry + STLExporter
 
 ## Code Structure
 
-### Frontend Components
+### Frontend Components (index.html)
 
 #### Scene Initialization
 ```javascript
 function initScene() {
-  // Creates Three.js scene with lighting and controls
-  // Sets up camera and renderer
+  // Creates Three.js scene with lighting
+  // Sets up OrbitControls for camera manipulation
+  // Configures renderer with antialiasing
 }
 ```
 
 #### Preview Update
 ```javascript
 function updatePreview() {
-  // Called when input changes
-  // Regenerates 3D mesh
-  // Recalculates statistics
+  // Called when any input changes
+  // Regenerates all Three.js geometry
+  // Updates scene immediately
 }
 ```
 
-#### Statistics Calculation
+#### Geometry Creation Functions
 ```javascript
-function calculateStats(width, height, depth, tolerance, wallThickness) {
-  // Calculates volume, weight, print time
-  // Updates display values
+function createFaceplate()    // Main bracket body with device cutout
+function createRackEar()      // Side ear with M6 holes (uses Shape.holes)
+function createShelf()        // Support shelf below device
+function createGussets()      // Triangular supports for shelf
+function createJoiningFlange() // Flange with M3 holes for connecting brackets
+```
+
+#### STL Export
+```javascript
+function downloadSTLFromPreview() {
+  // Uses THREE.STLExporter to convert scene to binary STL
+  // Creates Blob and triggers download
+  // What-you-see-is-what-you-get export
 }
 ```
 
-### Backend Components
+### Critical Implementation: Rack Ear Holes
 
-#### RackMountGenerator Class
-Main generator class that creates bracket geometry.
+The rack ear uses `THREE.Shape` with `Shape.holes` for proper hole cutouts:
 
-**Key Methods**:
-- `create_bracket(side)`: Creates left or right bracket
-- `create_retention_clip()`: Creates front clip
-- `create_support_posts()`: Creates support geometry
-- `generate_all_parts()`: Coordinates all part generation
-
-**Parameters**:
-```python
-generator = RackMountGenerator(
-    device_width=100,
-    device_height=44,
-    device_depth=200,
-    tolerance=2,
-    wall_thickness=3,
-    add_support=True,
-    add_rack_holes=False
-)
+```javascript
+function createRackEar() {
+  const shape = new THREE.Shape();
+  // Draw outer rectangle
+  shape.moveTo(...);
+  shape.lineTo(...);
+  
+  // Add holes using THREE.Path with absarc
+  const holePath = new THREE.Path();
+  holePath.absarc(x, y, radius, 0, Math.PI * 2, false);
+  shape.holes.push(holePath);
+  
+  // Extrude creates actual holes
+  const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+}
 ```
+
+**Why this matters**: Using cylinder meshes would ADD geometry instead of subtracting it. Shape.holes is the correct Three.js approach for creating actual holes.
 
 #### STLWriter Class
 Handles STL file output in both ASCII and binary formats.
