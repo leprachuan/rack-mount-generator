@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>19" Rack Mount Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .divider {
+            border-top: 2px solid #e0e0e0;
+            margin: 25px 0;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-download {
+            background: #4caf50;
+            color: white;
+            font-size: 14px;
+            padding: 10px 16px;
+            margin-top: 10px;
+        }
+
+        .btn-download:hover {
+            background: #45a049;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #333;
+        }
+
+        #preview-container {
+            width: 100%;
+            height: 600px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .stat-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .file-list {
+            background: #f9f9f9;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-name {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .file-size {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .error {
+            color: #d32f2f;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        .success {
+            color: #4caf50;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #preview-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="panel">
+            <h1>🔧 19" Rack Mount Generator</h1>
+            <p class="subtitle">Create custom 3D-printable mounting brackets for square devices</p>
+
+            <div class="info-box">
+                ℹ️ Enter your device dimensions (Width × Height × Depth) to generate customized STL files optimized for 3D printing.
+            </div>
+
+            <form id="mountForm">
+                <!-- Device Dimensions -->
+                <div class="section-title">Device Dimensions (mm)</div>
+
+                <div class="form-group">
+                    <label>Width × Height × Depth</label>
+                    <div class="input-row">
+                        <div>
+                            <input type="number" id="deviceWidth" placeholder="100" min="10" max="500" value="100" required>
+                            <div class="input-label">Width</div>
+                        </div>
+                        <div>
+                            <input type="number" id="deviceHeight" placeholder="44" min="10" max="500" value="44" required>
+                            <div class="input-label">Height</div>
+                        </div>
+                        <div>
+                            <input type="number" id="deviceDepth" placeholder="200" min="10" max="500" value="200" required>
+                            <div class="input-label">Depth</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tolerance Settings -->
+                <div class="divider"></div>
+                <div class="section-title">Mount Settings</div>
+
+                <div class="form-group">
+                    <label for="tolerance">Wall Clearance (mm)</label>
+                    <input type="number" id="tolerance" value="2" min="0.5" max="10" step="0.5" required>
+                    <div class="input-label">Space between device and bracket walls</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="wallThickness">Wall Thickness (mm)</label>
+                    <input type="number" id="wallThickness" value="3" min="1.5" max="10" step="0.5" required>
+                    <div class="input-label">Thickness of mounting bracket walls</div>
+                </div>
+
+                <!-- Printer Settings -->
+                <div class="divider"></div>
+                <div class="section-title">Printer Configuration</div>
+
+                <div class="form-group">
+                    <label for="bedSize">Bed Size Preset</label>
+                    <select id="bedSize" required>
+                        <option value="prusa">Prusa i3 MK3S (250 × 210mm)</option>
+                        <option value="ender3">Ender 3 (220 × 220mm)</option>
+                        <option value="anycubic_kobra">Anycubic Kobra S1 (250 × 250mm)</option>
+                        <option value="cr10">CR-10 (300 × 300mm)</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customBedGroup" style="display: none;">
+                    <label>Custom Bed Size (mm)</label>
+                    <div class="input-row">
+                        <div>
+                            <input type="number" id="bedWidth" placeholder="250" min="100" max="500" value="">
+                            <div class="input-label">Width</div>
+                        </div>
+                        <div>
+                            <input type="number" id="bedDepth" placeholder="210" min="100" max="500" value="">
+                            <div class="input-label">Depth</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="infill">Infill Density</label>
+                    <select id="infill" required>
+                        <option value="15">15% (Light & Fast)</option>
+                        <option value="20" selected>20% (Standard)</option>
+                        <option value="30">30% (Strong)</option>
+                        <option value="50">50% (Very Strong)</option>
+                    </select>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="divider"></div>
+                <div class="section-title">Advanced Options</div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="addSupport" checked>
+                        <label for="addSupport" style="margin-bottom: 0;">Include underside support posts</label>
+                    </div>
+                    <div class="input-label" style="margin-top: 8px;">Adds support underneath to prevent sagging</div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="addRackHoles">
+                        <label for="addRackHoles" style="margin-bottom: 0;">Add 19" rack mounting holes</label>
+                    </div>
+                    <div class="input-label" style="margin-top: 8px;">Standard square hole pattern for rack rails</div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="button-group">
+                    <button type="button" class="btn-secondary" onclick="resetForm()">Reset</button>
+                    <button type="submit" class="btn-primary">Generate Mount</button>
+                </div>
+            </form>
+
+            <!-- Status Messages -->
+            <div id="statusMessage"></div>
+
+            <!-- Generated Files -->
+            <div id="filesContainer" style="display: none;">
+                <div class="section-title" style="margin-top: 25px;">📦 Generated Files</div>
+                <div class="file-list" id="fileList"></div>
+            </div>
+        </div>
+
+        <!-- Preview Panel -->
+        <div class="panel">
+            <h1>3D Preview</h1>
+            <p class="subtitle">Real-time visualization of your mount design</p>
+
+            <div id="preview-container">
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Generating preview...</p>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="volumeValue">0</div>
+                    <div class="stat-label">Volume (cm³)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="weightValue">0</div>
+                    <div class="stat-label">Est. Weight (g)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="timeValue">0h</div>
+                    <div class="stat-label">Est. Print Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="partsValue">0</div>
+                    <div class="stat-label">Print Parts</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // THREE.JS Scene Setup
+        let scene, camera, renderer, controls, mountMesh, supportMesh;
+
+        function initScene() {
+            const container = document.getElementById('preview-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf5f5f5);
+            scene.add(new THREE.GridHelper(400, 40, 0xe0e0e0, 0xf0f0f0));
+
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(150, 100, 150);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 2;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 100, 100);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Generate Mount Bracket Geometry
+        function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport) {
+            const group = new THREE.Group();
+
+            // Main bracket - L-shaped piece
+            const bracketGeom = new THREE.BoxGeometry(
+                width + 2 * (tolerance + wallThickness),
+                height + 2 * (tolerance + wallThickness),
+                wallThickness
+            );
+            const bracketMat = new THREE.MeshPhongMaterial({ color: 0x667eea });
+            const bracket = new THREE.Mesh(bracketGeom, bracketMat);
+            bracket.position.z = -wallThickness / 2;
+            group.add(bracket);
+
+            // Back support plate
+            const backPlateGeom = new THREE.BoxGeometry(
+                width + 2 * (tolerance + wallThickness),
+                height + 2 * (tolerance + wallThickness),
+                wallThickness / 2
+            );
+            const backPlate = new THREE.Mesh(backPlateGeom, bracketMat);
+            backPlate.position.z = -(wallThickness + 30);
+            group.add(backPlate);
+
+            // Side support rails
+            const railGeom = new THREE.BoxGeometry(wallThickness, height + 2 * (tolerance + wallThickness), 30);
+            const leftRail = new THREE.Mesh(railGeom, bracketMat);
+            leftRail.position.x = -(width / 2 + tolerance + wallThickness / 2);
+            leftRail.position.z = -(wallThickness / 2 + 15);
+            group.add(leftRail);
+
+            const rightRail = new THREE.Mesh(railGeom, bracketMat);
+            rightRail.position.x = (width / 2 + tolerance + wallThickness / 2);
+            rightRail.position.z = -(wallThickness / 2 + 15);
+            group.add(rightRail);
+
+            // Support posts if enabled
+            if (addSupport) {
+                const postGeom = new THREE.BoxGeometry(wallThickness, wallThickness, 20);
+                const postMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
+                
+                const positions = [
+                    [-width / 4, -height / 4, 0],
+                    [width / 4, -height / 4, 0],
+                    [-width / 4, height / 4, 0],
+                    [width / 4, height / 4, 0]
+                ];
+                
+                positions.forEach(pos => {
+                    const post = new THREE.Mesh(postGeom, postMat);
+                    post.position.set(pos[0], pos[1], -(wallThickness / 2 + 10));
+                    group.add(post);
+                });
+            }
+
+            return group;
+        }
+
+        // Update preview
+        function updatePreview() {
+            const width = parseFloat(document.getElementById('deviceWidth').value);
+            const height = parseFloat(document.getElementById('deviceHeight').value);
+            const depth = parseFloat(document.getElementById('deviceDepth').value);
+            const tolerance = parseFloat(document.getElementById('tolerance').value);
+            const wallThickness = parseFloat(document.getElementById('wallThickness').value);
+            const addSupport = document.getElementById('addSupport').checked;
+
+            // Remove old mesh
+            if (mountMesh) scene.remove(mountMesh);
+            if (supportMesh) scene.remove(supportMesh);
+
+            // Generate geometry (returns a group)
+            mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport);
+            scene.add(mountMesh);
+
+            // Remove old device mesh if exists
+            const oldDevice = scene.getObjectByName('deviceMesh');
+            if (oldDevice) scene.remove(oldDevice);
+
+            // Add device representation (semi-transparent)
+            const deviceGeometry = new THREE.BoxGeometry(width, height, depth);
+            const deviceMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff6b6b,
+                transparent: true,
+                opacity: 0.25,
+                wireframe: false
+            });
+            const deviceMesh = new THREE.Mesh(deviceGeometry, deviceMaterial);
+            deviceMesh.name = 'deviceMesh';
+            deviceMesh.position.z = -(wallThickness + tolerance + depth / 2);
+            scene.add(deviceMesh);
+
+            // Calculate stats
+            calculateStats(width, height, depth, tolerance, wallThickness);
+        }
+
+        function calculateStats(width, height, depth, tolerance, wallThickness) {
+            // Approximate volume calculation
+            const outerW = width + 2 * (tolerance + wallThickness);
+            const outerH = height + 2 * (tolerance + wallThickness);
+            const outerVolume = outerW * outerH * wallThickness;
+            const innerVolume = width * height * wallThickness;
+            const materialVolume = (outerVolume - innerVolume) / 1000; // cm³
+
+            const infill = parseInt(document.getElementById('infill').value) / 100;
+            const estimatedVolume = materialVolume * infill;
+            const estimatedWeight = estimatedVolume * 1.24; // PLA density
+
+            document.getElementById('volumeValue').textContent = estimatedVolume.toFixed(1);
+            document.getElementById('weightValue').textContent = estimatedWeight.toFixed(1);
+            document.getElementById('partsValue').textContent = '3';
+
+            // Rough estimate: 0.5 hours per 5cm³ at 20% infill
+            const printHours = (estimatedVolume / 5) * 0.5;
+            document.getElementById('timeValue').textContent = printHours.toFixed(1) + 'h';
+        }
+
+        // Form Handling
+        document.getElementById('mountForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                width: parseFloat(document.getElementById('deviceWidth').value),
+                height: parseFloat(document.getElementById('deviceHeight').value),
+                depth: parseFloat(document.getElementById('deviceDepth').value),
+                tolerance: parseFloat(document.getElementById('tolerance').value),
+                wallThickness: parseFloat(document.getElementById('wallThickness').value),
+                addSupport: document.getElementById('addSupport').checked,
+                addRackHoles: document.getElementById('addRackHoles').checked,
+                infill: document.getElementById('infill').value,
+                bedSize: document.getElementById('bedSize').value
+            };
+
+            const statusDiv = document.getElementById('statusMessage');
+            
+            try {
+                // Show loading state
+                statusDiv.innerHTML = '<p style="color: #667eea;">⏳ Generating mount...</p>';
+                
+                // Call backend API
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Generation failed');
+                }
+
+                const result = await response.json();
+                
+                // Display success message
+                statusDiv.innerHTML = `<p class="success">✓ Mount generated successfully! Job ID: ${result.job_id}</p>`;
+                
+                // Display generated files
+                displayGeneratedFiles(result.job_id, result.files, result.stats);
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<p class="error">✗ Error: ${error.message}</p>`;
+                console.error('Generation error:', error);
+            }
+        });
+
+        function displayGeneratedFiles(jobId, files, stats) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                
+                let sizeInfo = '';
+                if (file.size_mb) {
+                    sizeInfo += `${file.size_mb} MB`;
+                }
+                if (file.triangles) {
+                    sizeInfo += ` • ${file.triangles.toLocaleString()} triangles`;
+                }
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="file-name">📄 ${file.name}</div>
+                        <div class="file-size">${sizeInfo}</div>
+                    </div>
+                    <button class="btn-download" onclick="downloadFile('${jobId}', '${file.name}')">⬇ Download</button>
+                `;
+                fileList.appendChild(item);
+            });
+            
+            // Add download all button
+            const downloadAllItem = document.createElement('div');
+            downloadAllItem.className = 'file-item';
+            downloadAllItem.style.marginTop = '15px';
+            downloadAllItem.innerHTML = `
+                <div>
+                    <div class="file-name">📦 Download All as ZIP</div>
+                    <div class="file-size">All files packaged together</div>
+                </div>
+                <button class="btn-download" style="background: #2196F3;" onclick="downloadAllFiles('${jobId}')">⬇ Download ZIP</button>
+            `;
+            fileList.appendChild(downloadAllItem);
+
+            document.getElementById('filesContainer').style.display = 'block';
+        }
+
+        function downloadFile(jobId, filename) {
+            const link = document.createElement('a');
+            link.href = `/api/download/${jobId}/${filename}`;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function downloadAllFiles(jobId) {
+            const link = document.createElement('a');
+            link.href = `/api/download-zip/${jobId}`;
+            link.download = `rack_mount_${jobId}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function resetForm() {
+            document.getElementById('mountForm').reset();
+            document.getElementById('deviceWidth').value = '100';
+            document.getElementById('deviceHeight').value = '44';
+            document.getElementById('deviceDepth').value = '200';
+            document.getElementById('tolerance').value = '2';
+            document.getElementById('wallThickness').value = '3';
+            document.getElementById('infill').value = '20';
+            document.getElementById('filesContainer').style.display = 'none';
+            document.getElementById('statusMessage').innerHTML = '';
+            updatePreview();
+        }
+
+        // Bed size presets
+        const bedSizePresets = {
+            'prusa': { width: 250, depth: 210 },
+            'ender3': { width: 220, depth: 220 },
+            'anycubic_kobra': { width: 250, depth: 250 },
+            'cr10': { width: 300, depth: 300 },
+            'custom': { width: null, depth: null }
+        };
+
+        // Bed size handler
+        document.getElementById('bedSize').addEventListener('change', (e) => {
+            const customGroup = document.getElementById('customBedGroup');
+            const bedWidth = document.getElementById('bedWidth');
+            const bedDepth = document.getElementById('bedDepth');
+            
+            if (e.target.value === 'custom') {
+                customGroup.style.display = 'block';
+                bedWidth.value = '';
+                bedDepth.value = '';
+                bedWidth.focus();
+            } else {
+                customGroup.style.display = 'none';
+                const preset = bedSizePresets[e.target.value];
+                if (preset) {
+                    bedWidth.value = preset.width;
+                    bedDepth.value = preset.depth;
+                }
+            }
+        });
+
+        // Input listeners for live preview
+        ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'infill'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreview);
+        });
+
+        document.getElementById('addSupport').addEventListener('change', updatePreview);
+
+        // Initialize
+        window.addEventListener('load', () => {
+            initScene();
+            updatePreview();
+        });
+
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('preview-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>
