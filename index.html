@@ -339,6 +339,27 @@
                     <div class="input-label">Thickness of the front mounting plate</div>
                 </div>
 
+                <!-- Rack Ear Settings -->
+                <div class="divider"></div>
+                <div class="section-title">Rack Ear Configuration</div>
+
+                <div class="form-group">
+                    <label for="earSide">Rack Ear Side</label>
+                    <select id="earSide" required>
+                        <option value="left" selected>Left Side</option>
+                        <option value="right">Right Side</option>
+                    </select>
+                    <div class="input-label">Which side the mounting ear attaches to the rack rail</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="addRackHoles" checked>
+                        Add Rack Mounting Holes
+                    </label>
+                    <div class="input-label">Standard M6 holes for rack rail attachment</div>
+                </div>
+
                 <!-- Printer Settings -->
                 <div class="divider"></div>
                 <div class="section-title">Printer Configuration</div>
@@ -503,6 +524,10 @@
             const RACK_HALF_WIDTH = 225.0;  // Half of 19" rack inside width
             const RACK_UNIT_HEIGHT = 44.45; // 1U in mm
             const DEVICE_HEIGHT_PER_U = 35.0; // Max device height per rack unit (leaves room for tolerance)
+            const EAR_WIDTH = 15.875; // Standard rack ear width
+            
+            // Get ear side from form
+            const earSide = document.getElementById('earSide').value;
             
             // Calculate dimensions
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
@@ -521,6 +546,7 @@
             // Material for the bracket
             const bracketMat = new THREE.MeshPhongMaterial({ color: 0x667eea });
             const shelfMat = new THREE.MeshPhongMaterial({ color: 0x764ba2 });
+            const earMat = new THREE.MeshPhongMaterial({ color: 0x4CAF50 });
             
             // Create faceplate with hole using CSG-like approach with BoxGeometry pieces
             // Since Three.js doesn't have native CSG, we'll build it from pieces
@@ -560,11 +586,15 @@
             }
             
             // Support shelf (extends back from bottom of opening)
+            // Shelf is wider than opening with triangular gussets for strength
             if (addSupport) {
                 const shelfThickness = 5; // mm
                 const shelfDepth = depth + 10; // Extends 10mm past device
+                const gussetWidth = 15; // Extra width on each side for gussets
                 
-                const shelfGeom = new THREE.BoxGeometry(openingWidth, shelfThickness, shelfDepth);
+                // Wider shelf
+                const shelfWidth = openingWidth + (gussetWidth * 2);
+                const shelfGeom = new THREE.BoxGeometry(shelfWidth, shelfThickness, shelfDepth);
                 const shelfMesh = new THREE.Mesh(shelfGeom, shelfMat);
                 // Position: centered under opening, extending back
                 shelfMesh.position.set(
@@ -573,7 +603,183 @@
                     -faceplateThickness - shelfDepth/2
                 );
                 group.add(shelfMesh);
+                
+                // Left triangular gusset (right triangle for support)
+                // Gusset height matches device height
+                const gussetHeight = height; // Device height
+                const gussetShape = new THREE.Shape();
+                gussetShape.moveTo(0, 0);  // Front bottom
+                gussetShape.lineTo(shelfDepth, 0);  // Back bottom
+                gussetShape.lineTo(0, gussetHeight);  // Front top (height = device height)
+                gussetShape.lineTo(0, 0);  // Close
+                
+                const extrudeSettings = {
+                    steps: 1,
+                    depth: gussetWidth,
+                    bevelEnabled: false
+                };
+                
+                const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, extrudeSettings);
+                
+                // Left gusset
+                const leftGusset = new THREE.Mesh(gussetGeom, shelfMat);
+                leftGusset.rotation.y = Math.PI / 2;
+                leftGusset.position.set(
+                    openingX - gussetWidth,
+                    openingY,
+                    -faceplateThickness
+                );
+                group.add(leftGusset);
+                
+                // Right gusset
+                const rightGusset = new THREE.Mesh(gussetGeom, shelfMat);
+                rightGusset.rotation.y = Math.PI / 2;
+                rightGusset.position.set(
+                    openingX + openingWidth,
+                    openingY,
+                    -faceplateThickness
+                );
+                group.add(rightGusset);
             }
+            
+            // Rack ear (mounting flange)
+            const earGeom = new THREE.BoxGeometry(EAR_WIDTH, faceplateHeight, faceplateThickness);
+            const earMesh = new THREE.Mesh(earGeom, earMat);
+            if (earSide === 'left') {
+                earMesh.position.set(-EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+            } else {
+                earMesh.position.set(faceplateWidth + EAR_WIDTH/2, faceplateHeight/2, -faceplateThickness/2);
+            }
+            group.add(earMesh);
+            
+            // Rack mounting holes (on the ear)
+            const addRackHoles = document.getElementById('addRackHoles').checked;
+            if (addRackHoles) {
+                const holeRadius = 3.175; // M6 hole radius (6.35mm / 2)
+                const holeMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+                
+                // Calculate hole X position (center of ear)
+                let holeX;
+                if (earSide === 'left') {
+                    holeX = -EAR_WIDTH / 2;
+                } else {
+                    holeX = faceplateWidth + EAR_WIDTH / 2;
+                }
+                
+                // 3 holes per rack unit
+                for (let u = 0; u < rackUnits; u++) {
+                    const baseY = u * RACK_UNIT_HEIGHT;
+                    const holePositionsY = [
+                        baseY + 6.35,    // First hole
+                        baseY + 22.225,  // Middle hole
+                        baseY + 38.1     // Third hole
+                    ];
+                    
+                    holePositionsY.forEach(holeY => {
+                        const holeGeom = new THREE.CylinderGeometry(holeRadius, holeRadius, faceplateThickness + 1, 16);
+                        const holeMesh = new THREE.Mesh(holeGeom, holeMat);
+                        holeMesh.rotation.x = Math.PI / 2;
+                        holeMesh.position.set(holeX, holeY, -faceplateThickness/2);
+                        group.add(holeMesh);
+                    });
+                }
+            }
+            
+            // Joining flange (on inner edge, opposite from ear)
+            // This flange extends back into the rack and has M3 holes for connecting brackets
+            const flangeWidth = 5;  // mm (thin for short M3 screws)
+            const flangeDepth = 50.8;  // 2 inches
+            const flangeMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Purple
+            
+            const flangeGeom = new THREE.BoxGeometry(flangeWidth, faceplateHeight, flangeDepth);
+            const flangeMesh = new THREE.Mesh(flangeGeom, flangeMat);
+            
+            if (earSide === 'left') {
+                // Flange on right edge (inner)
+                flangeMesh.position.set(
+                    faceplateWidth - flangeWidth/2,
+                    faceplateHeight/2,
+                    -faceplateThickness - flangeDepth/2
+                );
+            } else {
+                // Flange on left edge (inner)
+                flangeMesh.position.set(
+                    flangeWidth/2,
+                    faceplateHeight/2,
+                    -faceplateThickness - flangeDepth/2
+                );
+            }
+            group.add(flangeMesh);
+            
+            // M3 joining holes (horizontal through the flange)
+            const m3HoleRadius = 1.6; // M3 clearance hole
+            const m3HoleMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+            
+            // Place holes at regular intervals along height
+            const numJoiningHoles = Math.max(2, Math.floor(faceplateHeight / 30));
+            const joiningSpacing = faceplateHeight / (numJoiningHoles + 1);
+            
+            // Two Z positions: near front and near back of flange
+            const zFront = -faceplateThickness - 15;
+            const zBack = -faceplateThickness - flangeDepth + 15;
+            
+            for (let i = 1; i <= numJoiningHoles; i++) {
+                const holeY = i * joiningSpacing;
+                
+                [zFront, zBack].forEach(zPos => {
+                    const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
+                    const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
+                    holeMesh.rotation.z = Math.PI / 2; // Rotate to horizontal (X axis)
+                    
+                    if (earSide === 'left') {
+                        holeMesh.position.set(faceplateWidth - flangeWidth/2, holeY, zPos);
+                    } else {
+                        holeMesh.position.set(flangeWidth/2, holeY, zPos);
+                    }
+                    group.add(holeMesh);
+                });
+            }
+            
+            // Flange gussets (right-angle triangular supports connecting faceplate back to flange)
+            const gussetHeight = 15;  // Height up the faceplate back (Y)
+            const gussetDepth = 15;   // Depth along the flange (Z)
+            const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Same purple as flange
+            
+            // Create gusset shape (right triangle in Y-Z plane)
+            // Triangle: corner at origin, one leg up Y, one leg along -Z
+            const gussetShape = new THREE.Shape();
+            gussetShape.moveTo(0, 0);  // Corner (at faceplate back / flange front)
+            gussetShape.lineTo(0, gussetHeight);  // Up the faceplate back
+            gussetShape.lineTo(-gussetDepth, 0);  // Along the flange (into rack)
+            gussetShape.lineTo(0, 0);
+            
+            const gussetExtrudeSettings = {
+                steps: 1,
+                depth: flangeWidth,
+                bevelEnabled: false
+            };
+            
+            const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, gussetExtrudeSettings);
+            
+            // Bottom gusset
+            const bottomGusset = new THREE.Mesh(gussetGeom, gussetMat);
+            bottomGusset.rotation.x = -Math.PI / 2;  // Rotate to Y-Z plane
+            if (earSide === 'left') {
+                bottomGusset.position.set(faceplateWidth - flangeWidth, 0, -faceplateThickness);
+            } else {
+                bottomGusset.position.set(0, 0, -faceplateThickness);
+            }
+            group.add(bottomGusset);
+            
+            // Top gusset - copy of bottom, shifted up
+            const topGusset = new THREE.Mesh(gussetGeom.clone(), gussetMat);
+            topGusset.rotation.x = -Math.PI / 2;  // Same rotation as bottom
+            if (earSide === 'left') {
+                topGusset.position.set(faceplateWidth - flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
+            } else {
+                topGusset.position.set(0, faceplateHeight - gussetHeight, -faceplateThickness);
+            }
+            group.add(topGusset);
             
             // Center the group
             group.position.set(-faceplateWidth/2, -faceplateHeight/2, 0);
@@ -684,6 +890,7 @@
                 wallThickness: parseFloat(document.getElementById('wallThickness').value),
                 addSupport: document.getElementById('addSupport').checked,
                 addRackHoles: document.getElementById('addRackHoles').checked,
+                earSide: document.getElementById('earSide').value,
                 infill: document.getElementById('infill').value,
                 bedSize: document.getElementById('bedSize').value
             };
@@ -831,6 +1038,8 @@
         });
 
         document.getElementById('addSupport').addEventListener('change', updatePreview);
+        document.getElementById('earSide').addEventListener('change', updatePreview);
+        document.getElementById('addRackHoles').addEventListener('change', updatePreview);
 
         // Initialize
         window.addEventListener('load', () => {

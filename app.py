@@ -76,7 +76,8 @@ def generate_mount():
             'tolerance': float(data['tolerance']),
             'wall_thickness': float(data['wallThickness']),
             'add_support': data.get('addSupport', True),
-            'add_rack_holes': data.get('addRackHoles', False),
+            'add_rack_holes': data.get('addRackHoles', True),
+            'ear_side': data.get('earSide', 'left'),
             'infill': int(data.get('infill', 20)),
             'bed_size': data.get('bedSize', 'prusa'),
             'timestamp': datetime.now().isoformat()
@@ -98,7 +99,8 @@ def generate_mount():
             config['tolerance'],
             config['wall_thickness'],
             config['add_support'],
-            config['add_rack_holes']
+            config['add_rack_holes'],
+            ear_side=config['ear_side']
         )
 
         # Create unique output directory
@@ -295,12 +297,12 @@ if __name__ == '__main__':
 
     # Run Flask app
     print("🚀 Starting 19\" Rack Mount Generator Server")
-    print("📍 Open http://localhost:5000 in your browser")
-    print("\nServer running on http://127.0.0.1:5000")
+    print("📍 Open http://localhost:5001 in your browser")
+    print("\nServer running on http://127.0.0.1:5001")
 
     # Parse host and port from arguments
     host = '127.0.0.1'
-    port = 5000
+    port = 5001  # Use 5001 since macOS ControlCenter uses 5000
     
     if '--host' in sys.argv:
         host_idx = sys.argv.index('--host')
