@@ -58,9 +58,18 @@ Triangular supports connecting the faceplate back to the joining flange:
 
 ### Key Dimensions
 - `RACK_HALF_WIDTH = 225.0mm` - Half of 19" rack inner width
+- `FULL_RACK_WIDTH = 450.0mm` - Full 19" rack inner width
 - `RACK_UNIT_HEIGHT = 44.45mm` - Standard 1U height
 - `EAR_WIDTH = 15.875mm` - Standard rack ear width
 - `HOLE_DIAMETER = 6.35mm` - M6 clearance hole
+- Wide mode threshold: `openingWidth > 185mm` (225 - 40mm margin)
+
+### Wide Device Mode
+For devices wider than 185mm (won't fit in half-rack with margins), the generator automatically creates TWO brackets:
+- **Left bracket**: Left rack ear, joining flanges on right inner edge (top/bottom of opening)
+- **Right bracket**: Right rack ear, joining flanges on left inner edge (top/bottom of opening)
+- **Gussets**: Flange gussets are mirrored for each bracket side; shelf gussets only on outer edges
+- **Device centering**: Device preview is centered across full rack width (X=0)
 
 ## Common Tasks
 

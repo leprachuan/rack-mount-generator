@@ -857,11 +857,23 @@
             const gussetDepth = gussetSize;
             const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 });
             
+            // Create gusset shape - direction depends on bracket side
+            // Left bracket: flange on right, gusset points left (negative X)
+            // Right bracket: flange on left, gusset points right (positive X)
             const gussetShape = new THREE.Shape();
-            gussetShape.moveTo(0, 0);
-            gussetShape.lineTo(0, gussetHeight);
-            gussetShape.lineTo(-gussetDepth, 0);
-            gussetShape.lineTo(0, 0);
+            if (bracketSide === 'left') {
+                // Triangle pointing left (into the faceplate from right edge)
+                gussetShape.moveTo(0, 0);
+                gussetShape.lineTo(0, gussetHeight);
+                gussetShape.lineTo(-gussetDepth, 0);
+                gussetShape.lineTo(0, 0);
+            } else {
+                // Triangle pointing right (into the faceplate from left edge)
+                gussetShape.moveTo(0, 0);
+                gussetShape.lineTo(0, gussetHeight);
+                gussetShape.lineTo(gussetDepth, 0);
+                gussetShape.lineTo(0, 0);
+            }
             
             const gussetExtrudeSettings = {
                 steps: 1,
@@ -877,7 +889,8 @@
             if (bracketSide === 'left') {
                 bottomGusset.position.set(faceplateWidth - flangeWidth, 10, -faceplateThickness);
             } else {
-                bottomGusset.position.set(0, 10, -faceplateThickness);
+                // Right bracket: position at left edge of faceplate
+                bottomGusset.position.set(flangeWidth, 10, -faceplateThickness);
             }
             group.add(bottomGusset);
             
@@ -887,7 +900,8 @@
             if (bracketSide === 'left') {
                 topGusset.position.set(faceplateWidth - flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
             } else {
-                topGusset.position.set(0, faceplateHeight - gussetHeight, -faceplateThickness);
+                // Right bracket: position at left edge of faceplate
+                topGusset.position.set(flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
             }
             group.add(topGusset);
             
@@ -904,14 +918,16 @@
                 // Generate BOTH brackets for wide device
                 const RACK_HALF_WIDTH = 225.0;
                 
-                // Left bracket
+                // Left bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
+                // Position so it spans -RACK_HALF_WIDTH to 0 in world coords
                 const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'left');
-                leftBracket.position.set(-RACK_HALF_WIDTH/2, 0, 0);
+                leftBracket.position.set(-RACK_HALF_WIDTH, 0, 0);
                 group.add(leftBracket);
                 
-                // Right bracket - offset to the right
+                // Right bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
+                // Position so it spans 0 to RACK_HALF_WIDTH in world coords
                 const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'right');
-                rightBracket.position.set(RACK_HALF_WIDTH/2, 0, 0);
+                rightBracket.position.set(0, 0, 0);
                 group.add(rightBracket);
                 
                 // Calculate centering offset

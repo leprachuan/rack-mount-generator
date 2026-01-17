@@ -18,19 +18,20 @@ This project generates 3D-printable STL files for mounting devices in standard 1
 
 ```
 rack_mount_generator/
-├── index.html          # Complete frontend (form, preview, export)
-├── app.py              # Flask server
-├── stl_generator.py    # Legacy Python STL generator (unused)
+├── index.html          # Complete frontend (form, preview, export, ~1670 lines)
+├── app.py              # Minimal Flask server (serves static files, ~60 lines)
 ├── pyproject.toml      # Python dependencies
 ├── requirements.txt    # Pip requirements (backup)
-├── run.sh / run.bat    # Startup scripts
 ├── README.md           # User documentation
 ├── CLAUDE.md           # Claude-specific instructions
 ├── AGENTS.md           # This file
 ├── ARCHITECTURE.md     # System architecture
 ├── DEVELOPMENT.md      # Development guide
-└── QUICKSTART.md       # Quick start guide
+├── QUICKSTART.md       # Quick start guide
+└── *.md                # Various documentation files
 ```
+
+**Note:** Legacy files (stl_generator.py, run.sh, run.bat, etc.) were removed - all STL generation is now client-side.
 
 ## Critical Design Decisions
 
@@ -104,6 +105,22 @@ const geom = new THREE.ExtrudeGeometry(shape, settings);
 - Triangular (right-angle) shape
 - Top and bottom of faceplate
 - Bottom gusset raised 10mm from edge
+- In wide mode: mirrored direction for left vs right bracket
+
+### Wide Device Mode (Full-Rack Width)
+Automatically triggered when device opening > 185mm (RACK_HALF_WIDTH - 40mm margin):
+
+**Two-Bracket Generation:**
+- Left bracket: X coords -225 to 0, left rack ear, right-edge flanges
+- Right bracket: X coords 0 to 225, right rack ear, left-edge flanges
+- Flanges positioned ABOVE and BELOW device opening (not on sides)
+- Only OUTER shelf gussets (inner ones removed to avoid interference)
+- Flange gussets mirrored: left bracket points left, right bracket points right
+
+**Key Functions:**
+- `isWideDeviceMode(width, tolerance)` - Returns true if wide mode needed
+- `generateWideBracket(...)` - Generates individual left/right bracket
+- `exportBracketSTL(bracketSide)` - Exports single bracket for wide mode
 
 ## Modification Guidelines
 
