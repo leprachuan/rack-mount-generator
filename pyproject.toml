@@ -1,11 +1,9 @@
 [project]
 name = "rack-mount-generator"
-version = "0.1.0"
-description = "Rack mount generator for organizing hardware"
-requires-python = ">=3.10"
+version = "2.0.0"
+description = "19\" Rack Mount Generator - Client-side STL export via Three.js"
+requires-python = ">=3.11"
 dependencies = [
     "Flask==3.0.0",
-    "Flask-CORS==4.0.0",
-    "numpy>=1.26.0",
     "Werkzeug==3.0.1",
 ]
