@@ -428,7 +428,13 @@
                         </div>
                         <div>
                             <input type="number" id="gussetSize" value="15" min="5" max="30" step="1">
-                            <div class="input-label">Gussets</div>
+                            <div class="input-label">Flange Gussets</div>
+                        </div>
+                    </div>
+                    <div class="input-row">
+                        <div>
+                            <input type="number" id="shelfGussetWidth" value="15" min="3" max="40" step="1">
+                            <div class="input-label">Shelf Gusset Width</div>
                         </div>
                     </div>
                 </div>
@@ -550,19 +556,18 @@
         function isWideDeviceMode(width, tolerance) {
             const RACK_HALF_WIDTH = 225.0;
             const openingWidth = width + 2 * tolerance;
-            // If opening is wider than what fits in half-rack (leaving room for edges), use wide mode
-            // Allow some margin (20mm on each side minimum)
-            return openingWidth > (RACK_HALF_WIDTH - 40);
+            // If opening is wider than 200mm, use wide mode (two brackets)
+            return openingWidth > 200;
         }
 
         // Generate a single bracket for wide-device mode
         // bracketSide: 'left' or 'right' determines which half we're generating
-        function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, bracketSide) {
+        function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide) {
             const group = new THREE.Group();
             
             const RACK_HALF_WIDTH = 225.0;
             const RACK_UNIT_HEIGHT = 44.45;
-            const DEVICE_HEIGHT_PER_U = 35.0;
+            const DEVICE_HEIGHT_PER_U = 25.0;  // Tighter fit for wide mode (25mm vs 35mm standard)
             const EAR_WIDTH = 15.875;
             const FULL_RACK_WIDTH = RACK_HALF_WIDTH * 2;  // 450mm
             
@@ -651,7 +656,7 @@
             // Support shelf - only on the side with opening, with OUTER gusset only
             if (addSupport && !isBlank && localOpeningWidth > 0) {
                 const shelfDepth = depth + 10;
-                const gussetWidth = 15;
+                const gussetWidth = shelfGussetWidth;
                 
                 // Shelf extends from the opening edge to the outer edge of bracket
                 let shelfStart, shelfWidth, hasOuterGusset;
@@ -779,101 +784,127 @@
             }
             
             // Joining flanges - TOP and BOTTOM (to connect to the other bracket)
+            // Using ExtrudeGeometry with Shape.holes to create actual holes through the flange
             const flangeWidth = flangeThickness;
             const flangeDepth = 50.8;  // 2 inches
             const m3HoleRadius = 1.6;
-            const m3HoleMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
             
-            // Determine flange X position (on the INNER edge, towards center of rack)
-            let flangeX;
-            if (bracketSide === 'left') {
-                flangeX = faceplateWidth - flangeWidth/2;  // Right edge of left bracket
-            } else {
-                flangeX = flangeWidth/2;  // Left edge of right bracket
+            // Helper to create flange with real holes
+            // Shape is drawn in depth(X) × height(Y) plane, extruded along flangeWidth
+            // Then rotated so extrusion (holes) go along world X axis
+            // Front hole offset: gussetSize + 5mm clearance to avoid gusset conflict
+            const frontHoleOffset = gussetSize + 5;
+            const backHoleOffset = 15;  // Back holes stay at 15mm from back edge
+            
+            function createFlangeWithHoles(fHeight, holeYPositions) {
+                const flangeShape = new THREE.Shape();
+                // Shape: X = depth (0 to flangeDepth), Y = height (0 to fHeight)
+                flangeShape.moveTo(0, 0);
+                flangeShape.lineTo(flangeDepth, 0);
+                flangeShape.lineTo(flangeDepth, fHeight);
+                flangeShape.lineTo(0, fHeight);
+                flangeShape.lineTo(0, 0);
+                
+                // Add holes - two per Y position (front and back of flange)
+                // Front hole offset by gussetSize + 5mm to clear gussets
+                holeYPositions.forEach(holeY => {
+                    const hole1 = new THREE.Path();
+                    hole1.absarc(frontHoleOffset, holeY, m3HoleRadius, 0, Math.PI * 2, true);
+                    flangeShape.holes.push(hole1);
+                    
+                    const hole2 = new THREE.Path();
+                    hole2.absarc(flangeDepth - backHoleOffset, holeY, m3HoleRadius, 0, Math.PI * 2, true);
+                    flangeShape.holes.push(hole2);
+                });
+                
+                const extrudeSettings = {
+                    steps: 1,
+                    depth: flangeWidth,
+                    bevelEnabled: false
+                };
+                
+                return new THREE.ExtrudeGeometry(flangeShape, extrudeSettings);
             }
             
             // Bottom flange (below opening, at bottom of faceplate)
-            const bottomFlangeHeight = openingY;  // Height from bottom to opening
-            if (bottomFlangeHeight > 10) {  // Only add if there's room
-                const bottomFlangeGeom = new THREE.BoxGeometry(flangeWidth, bottomFlangeHeight, flangeDepth);
-                const bottomFlangeMesh = new THREE.Mesh(bottomFlangeGeom, flangeMat);
-                bottomFlangeMesh.position.set(
-                    flangeX,
-                    bottomFlangeHeight/2,
-                    -faceplateThickness - flangeDepth/2
-                );
-                group.add(bottomFlangeMesh);
-                
-                // M3 holes in bottom flange
-                const numBottomHoles = Math.max(1, Math.floor(bottomFlangeHeight / 25));
-                const bottomSpacing = bottomFlangeHeight / (numBottomHoles + 1);
-                const zFront = -faceplateThickness - 15;
-                const zBack = -faceplateThickness - flangeDepth + 15;
-                
-                for (let i = 1; i <= numBottomHoles; i++) {
-                    const holeY = i * bottomSpacing;
-                    [zFront, zBack].forEach(zPos => {
-                        const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
-                        const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
-                        holeMesh.rotation.z = Math.PI / 2;
-                        holeMesh.position.set(flangeX, holeY, zPos);
-                        group.add(holeMesh);
-                    });
+            const bottomFlangeHeight = openingY;
+            if (bottomFlangeHeight > 5) {
+                // Calculate hole Y positions
+                let bottomHoleYPositions = [];
+                if (bottomFlangeHeight >= 6) {
+                    if (bottomFlangeHeight >= 20) {
+                        const numHoles = Math.max(1, Math.floor(bottomFlangeHeight / 20));
+                        const edgeMargin = 5;
+                        const usableHeight = bottomFlangeHeight - 2 * edgeMargin;
+                        const spacing = numHoles > 1 ? usableHeight / (numHoles - 1) : 0;
+                        for (let i = 0; i < numHoles; i++) {
+                            bottomHoleYPositions.push(edgeMargin + (numHoles > 1 ? i * spacing : usableHeight / 2));
+                        }
+                    } else {
+                        bottomHoleYPositions.push(bottomFlangeHeight / 2);
+                    }
                 }
+                
+                const bottomFlangeGeom = createFlangeWithHoles(bottomFlangeHeight, bottomHoleYPositions);
+                const bottomFlangeMesh = new THREE.Mesh(bottomFlangeGeom, flangeMat);
+                
+                // Rotate so extrusion (local Z) becomes world X (hole direction)
+                // After rotation.y = PI/2: local Z → world X, local X → world -Z, local Y → world Y
+                bottomFlangeMesh.rotation.y = Math.PI / 2;
+                
+                // Position: after rotation, mesh spans X: 0 to flangeWidth, Y: 0 to height, Z: 0 to -flangeDepth
+                // We want it at Z = -faceplateThickness (front edge)
+                if (bracketSide === 'left') {
+                    bottomFlangeMesh.position.set(faceplateWidth - flangeWidth, 0, -faceplateThickness);
+                } else {
+                    bottomFlangeMesh.position.set(0, 0, -faceplateThickness);
+                }
+                group.add(bottomFlangeMesh);
             }
             
             // Top flange (above opening, at top of faceplate)
             const topFlangeHeight = faceplateHeight - openingY - openingHeight;
-            if (topFlangeHeight > 10) {  // Only add if there's room
-                const topFlangeGeom = new THREE.BoxGeometry(flangeWidth, topFlangeHeight, flangeDepth);
-                const topFlangeMesh = new THREE.Mesh(topFlangeGeom, flangeMat);
-                topFlangeMesh.position.set(
-                    flangeX,
-                    openingY + openingHeight + topFlangeHeight/2,
-                    -faceplateThickness - flangeDepth/2
-                );
-                group.add(topFlangeMesh);
-                
-                // M3 holes in top flange
-                const numTopHoles = Math.max(1, Math.floor(topFlangeHeight / 25));
-                const topSpacing = topFlangeHeight / (numTopHoles + 1);
-                const zFront = -faceplateThickness - 15;
-                const zBack = -faceplateThickness - flangeDepth + 15;
-                
-                for (let i = 1; i <= numTopHoles; i++) {
-                    const holeY = openingY + openingHeight + i * topSpacing;
-                    [zFront, zBack].forEach(zPos => {
-                        const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
-                        const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
-                        holeMesh.rotation.z = Math.PI / 2;
-                        holeMesh.position.set(flangeX, holeY, zPos);
-                        group.add(holeMesh);
-                    });
+            if (topFlangeHeight > 5) {
+                // Calculate hole Y positions (relative to flange, not faceplate)
+                let topHoleYPositions = [];
+                if (topFlangeHeight >= 6) {
+                    if (topFlangeHeight >= 20) {
+                        const numHoles = Math.max(1, Math.floor(topFlangeHeight / 20));
+                        const edgeMargin = 5;
+                        const usableHeight = topFlangeHeight - 2 * edgeMargin;
+                        const spacing = numHoles > 1 ? usableHeight / (numHoles - 1) : 0;
+                        for (let i = 0; i < numHoles; i++) {
+                            topHoleYPositions.push(edgeMargin + (numHoles > 1 ? i * spacing : usableHeight / 2));
+                        }
+                    } else {
+                        topHoleYPositions.push(topFlangeHeight / 2);
+                    }
                 }
+                
+                const topFlangeGeom = createFlangeWithHoles(topFlangeHeight, topHoleYPositions);
+                const topFlangeMesh = new THREE.Mesh(topFlangeGeom, flangeMat);
+                topFlangeMesh.rotation.y = Math.PI / 2;
+                
+                // Position at top of opening
+                if (bracketSide === 'left') {
+                    topFlangeMesh.position.set(faceplateWidth - flangeWidth, openingY + openingHeight, -faceplateThickness);
+                } else {
+                    topFlangeMesh.position.set(0, openingY + openingHeight, -faceplateThickness);
+                }
+                group.add(topFlangeMesh);
             }
             
             // Flange gussets - at corners connecting faceplate to flanges
-            const gussetHeight = gussetSize;
+            // Calculate gusset dimensions - may need to shrink to fit available space
             const gussetDepth = gussetSize;
             const gussetMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 });
             
-            // Create gusset shape - direction depends on bracket side
-            // Left bracket: flange on right, gusset points left (negative X)
-            // Right bracket: flange on left, gusset points right (positive X)
-            const gussetShape = new THREE.Shape();
-            if (bracketSide === 'left') {
-                // Triangle pointing left (into the faceplate from right edge)
-                gussetShape.moveTo(0, 0);
-                gussetShape.lineTo(0, gussetHeight);
-                gussetShape.lineTo(-gussetDepth, 0);
-                gussetShape.lineTo(0, 0);
-            } else {
-                // Triangle pointing right (into the faceplate from left edge)
-                gussetShape.moveTo(0, 0);
-                gussetShape.lineTo(0, gussetHeight);
-                gussetShape.lineTo(gussetDepth, 0);
-                gussetShape.lineTo(0, 0);
-            }
+            // Bottom gusset: top should align with shelf (openingY), bottom at faceplate bottom (0)
+            // So max height is openingY
+            const bottomGussetHeight = Math.min(gussetSize, openingY);
+            
+            // Top gusset: bottom at top of opening, top should not exceed faceplate top
+            const topGussetHeight = Math.min(gussetSize, faceplateHeight - openingY - openingHeight);
             
             const gussetExtrudeSettings = {
                 steps: 1,
@@ -881,36 +912,72 @@
                 bevelEnabled: false
             };
             
-            const gussetGeom = new THREE.ExtrudeGeometry(gussetShape, gussetExtrudeSettings);
-            
-            // Bottom corner gusset
-            const bottomGusset = new THREE.Mesh(gussetGeom, gussetMat);
-            bottomGusset.rotation.x = -Math.PI / 2;
-            if (bracketSide === 'left') {
-                bottomGusset.position.set(faceplateWidth - flangeWidth, 10, -faceplateThickness);
-            } else {
-                // Right bracket: position at left edge of faceplate
-                bottomGusset.position.set(flangeWidth, 10, -faceplateThickness);
+            // Bottom corner gusset (only if there's room)
+            if (bottomGussetHeight > 5) {
+                // Create gusset shape - direction depends on bracket side
+                const bottomGussetShape = new THREE.Shape();
+                if (bracketSide === 'left') {
+                    // Triangle pointing left (into the faceplate from right edge)
+                    bottomGussetShape.moveTo(0, 0);
+                    bottomGussetShape.lineTo(0, bottomGussetHeight);
+                    bottomGussetShape.lineTo(-gussetDepth, 0);
+                    bottomGussetShape.lineTo(0, 0);
+                } else {
+                    // Triangle pointing right (into the faceplate from left edge)
+                    bottomGussetShape.moveTo(0, 0);
+                    bottomGussetShape.lineTo(0, bottomGussetHeight);
+                    bottomGussetShape.lineTo(gussetDepth, 0);
+                    bottomGussetShape.lineTo(0, 0);
+                }
+                
+                const bottomGussetGeom = new THREE.ExtrudeGeometry(bottomGussetShape, gussetExtrudeSettings);
+                const bottomGusset = new THREE.Mesh(bottomGussetGeom, gussetMat);
+                bottomGusset.rotation.x = -Math.PI / 2;
+                
+                // Position so top of gusset aligns with shelf (openingY), bottom at 0
+                const bottomGussetY = openingY - bottomGussetHeight;
+                if (bracketSide === 'left') {
+                    bottomGusset.position.set(faceplateWidth - flangeWidth, bottomGussetY, -faceplateThickness);
+                } else {
+                    bottomGusset.position.set(flangeWidth, bottomGussetY, -faceplateThickness);
+                }
+                group.add(bottomGusset);
             }
-            group.add(bottomGusset);
             
-            // Top corner gusset
-            const topGusset = new THREE.Mesh(gussetGeom.clone(), gussetMat);
-            topGusset.rotation.x = -Math.PI / 2;
-            if (bracketSide === 'left') {
-                topGusset.position.set(faceplateWidth - flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
-            } else {
-                // Right bracket: position at left edge of faceplate
-                topGusset.position.set(flangeWidth, faceplateHeight - gussetHeight, -faceplateThickness);
+            // Top corner gusset (only if there's room)
+            if (topGussetHeight > 5) {
+                const topGussetShape = new THREE.Shape();
+                if (bracketSide === 'left') {
+                    topGussetShape.moveTo(0, 0);
+                    topGussetShape.lineTo(0, topGussetHeight);
+                    topGussetShape.lineTo(-gussetDepth, 0);
+                    topGussetShape.lineTo(0, 0);
+                } else {
+                    topGussetShape.moveTo(0, 0);
+                    topGussetShape.lineTo(0, topGussetHeight);
+                    topGussetShape.lineTo(gussetDepth, 0);
+                    topGussetShape.lineTo(0, 0);
+                }
+                
+                const topGussetGeom = new THREE.ExtrudeGeometry(topGussetShape, gussetExtrudeSettings);
+                const topGusset = new THREE.Mesh(topGussetGeom, gussetMat);
+                topGusset.rotation.x = -Math.PI / 2;
+                
+                // Position at top of opening
+                if (bracketSide === 'left') {
+                    topGusset.position.set(faceplateWidth - flangeWidth, openingY + openingHeight, -faceplateThickness);
+                } else {
+                    topGusset.position.set(flangeWidth, openingY + openingHeight, -faceplateThickness);
+                }
+                group.add(topGusset);
             }
-            group.add(topGusset);
             
             return group;
         }
 
         // Generate Mount Bracket Geometry
         // This creates a preview that matches the STL generator output
-        function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize) {
+        function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth) {
             const group = new THREE.Group();
             
             // Check if wide device mode is needed
@@ -920,19 +987,19 @@
                 
                 // Left bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
                 // Position so it spans -RACK_HALF_WIDTH to 0 in world coords
-                const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'left');
+                const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'left');
                 leftBracket.position.set(-RACK_HALF_WIDTH, 0, 0);
                 group.add(leftBracket);
                 
                 // Right bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
                 // Position so it spans 0 to RACK_HALF_WIDTH in world coords
-                const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, 'right');
+                const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'right');
                 rightBracket.position.set(0, 0, 0);
                 group.add(rightBracket);
                 
-                // Calculate centering offset
+                // Calculate centering offset - must use same DEVICE_HEIGHT_PER_U as generateWideBracket
                 const RACK_UNIT_HEIGHT = 44.45;
-                const DEVICE_HEIGHT_PER_U = 35.0;
+                const DEVICE_HEIGHT_PER_U = 25.0;  // Wide mode uses 25mm
                 const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
                 const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
                 
@@ -1022,7 +1089,11 @@
             // Only add support if not a blank panel
             if (addSupport && !isBlank) {
                 const shelfDepth = depth + 10; // Extends 10mm past device
-                const gussetWidth = 15; // Extra width on each side for gussets
+                // Limit shelf gusset width to 5mm when width > 180mm but not in wide mode
+                let gussetWidth = shelfGussetWidth;
+                if (width > 180 && width <= 200) {
+                    gussetWidth = Math.min(gussetWidth, 5);
+                }
                 
                 // Wider shelf
                 const shelfWidth = openingWidth + (gussetWidth * 2);
@@ -1146,58 +1217,62 @@
             
             // Joining flange (on inner edge, opposite from ear)
             // This flange extends back into the rack and has M3 holes for connecting brackets
+            // Using ExtrudeGeometry with Shape.holes to create actual holes through the flange
             const flangeWidth = flangeThickness;  // mm (thin for short M3 screws)
             const flangeDepth = 50.8;  // 2 inches
             const flangeMat = new THREE.MeshPhongMaterial({ color: 0x9C27B0 }); // Purple
+            const m3HoleRadius = 1.6; // M3 clearance hole
             
-            const flangeGeom = new THREE.BoxGeometry(flangeWidth, faceplateHeight, flangeDepth);
+            // Calculate hole Y positions
+            const numJoiningHoles = Math.max(2, Math.floor(faceplateHeight / 30));
+            const joiningSpacing = faceplateHeight / (numJoiningHoles + 1);
+            const holeYPositions = [];
+            for (let i = 1; i <= numJoiningHoles; i++) {
+                holeYPositions.push(i * joiningSpacing);
+            }
+            
+            // Create flange shape with holes
+            // Shape: X = depth (0 to flangeDepth), Y = height (0 to faceplateHeight)
+            const flangeShape = new THREE.Shape();
+            flangeShape.moveTo(0, 0);
+            flangeShape.lineTo(flangeDepth, 0);
+            flangeShape.lineTo(flangeDepth, faceplateHeight);
+            flangeShape.lineTo(0, faceplateHeight);
+            flangeShape.lineTo(0, 0);
+            
+            // Add holes at front (gussetSize + 5mm to clear gussets) and back (15mm from back edge)
+            const frontHoleOffset = gussetSize + 5;
+            const backHoleOffset = 15;
+            holeYPositions.forEach(holeY => {
+                const hole1 = new THREE.Path();
+                hole1.absarc(frontHoleOffset, holeY, m3HoleRadius, 0, Math.PI * 2, true);
+                flangeShape.holes.push(hole1);
+                
+                const hole2 = new THREE.Path();
+                hole2.absarc(flangeDepth - backHoleOffset, holeY, m3HoleRadius, 0, Math.PI * 2, true);
+                flangeShape.holes.push(hole2);
+            });
+            
+            const flangeExtrudeSettings = {
+                steps: 1,
+                depth: flangeWidth,
+                bevelEnabled: false
+            };
+            
+            const flangeGeom = new THREE.ExtrudeGeometry(flangeShape, flangeExtrudeSettings);
             const flangeMesh = new THREE.Mesh(flangeGeom, flangeMat);
+            
+            // Rotate so extrusion (local Z) becomes world X (hole direction)
+            flangeMesh.rotation.y = Math.PI / 2;
             
             if (earSide === 'left') {
                 // Flange on right edge (inner)
-                flangeMesh.position.set(
-                    faceplateWidth - flangeWidth/2,
-                    faceplateHeight/2,
-                    -faceplateThickness - flangeDepth/2
-                );
+                flangeMesh.position.set(faceplateWidth - flangeWidth, 0, -faceplateThickness);
             } else {
                 // Flange on left edge (inner)
-                flangeMesh.position.set(
-                    flangeWidth/2,
-                    faceplateHeight/2,
-                    -faceplateThickness - flangeDepth/2
-                );
+                flangeMesh.position.set(0, 0, -faceplateThickness);
             }
             group.add(flangeMesh);
-            
-            // M3 joining holes (horizontal through the flange)
-            const m3HoleRadius = 1.6; // M3 clearance hole
-            const m3HoleMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
-            
-            // Place holes at regular intervals along height
-            const numJoiningHoles = Math.max(2, Math.floor(faceplateHeight / 30));
-            const joiningSpacing = faceplateHeight / (numJoiningHoles + 1);
-            
-            // Two Z positions: near front and near back of flange
-            const zFront = -faceplateThickness - 15;
-            const zBack = -faceplateThickness - flangeDepth + 15;
-            
-            for (let i = 1; i <= numJoiningHoles; i++) {
-                const holeY = i * joiningSpacing;
-                
-                [zFront, zBack].forEach(zPos => {
-                    const holeGeom = new THREE.CylinderGeometry(m3HoleRadius, m3HoleRadius, flangeWidth + 1, 16);
-                    const holeMesh = new THREE.Mesh(holeGeom, m3HoleMat);
-                    holeMesh.rotation.z = Math.PI / 2; // Rotate to horizontal (X axis)
-                    
-                    if (earSide === 'left') {
-                        holeMesh.position.set(faceplateWidth - flangeWidth/2, holeY, zPos);
-                    } else {
-                        holeMesh.position.set(flangeWidth/2, holeY, zPos);
-                    }
-                    group.add(holeMesh);
-                });
-            }
             
             // Flange gussets (right-angle triangular supports connecting faceplate back to flange)
             const gussetHeight = gussetSize;  // Height up the faceplate back (Y)
@@ -1256,6 +1331,7 @@
             const shelfThickness = parseFloat(document.getElementById('shelfThickness').value);
             const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
             const gussetSize = parseFloat(document.getElementById('gussetSize').value);
+            const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
             const addSupport = document.getElementById('addSupport').checked;
 
             // Remove old mesh
@@ -1263,7 +1339,7 @@
             if (supportMesh) scene.remove(supportMesh);
 
             // Generate geometry (returns a group)
-            mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize);
+            mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth);
             scene.add(mountMesh);
 
             // Remove old device mesh if exists
@@ -1274,7 +1350,9 @@
             const RACK_HALF_WIDTH = 225.0;
             const FULL_RACK_WIDTH = RACK_HALF_WIDTH * 2;
             const RACK_UNIT_HEIGHT = 44.45;
-            const DEVICE_HEIGHT_PER_U = 35.0;
+            // Use different DEVICE_HEIGHT_PER_U for wide vs standard mode
+            const isWide = isWideDeviceMode(width, tolerance);
+            const DEVICE_HEIGHT_PER_U = isWide ? 25.0 : 35.0;
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
             const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
             const openingWidth = width + 2 * tolerance;
@@ -1293,7 +1371,7 @@
             deviceMesh.name = 'deviceMesh';
             
             // Position device based on mode
-            if (isWideDeviceMode(width, tolerance)) {
+            if (isWide) {
                 // Wide mode: device is centered in full-width rack
                 deviceMesh.position.set(
                     0,  // Centered in full-width
@@ -1332,10 +1410,12 @@
             // Constants
             const RACK_HALF_WIDTH = 225.0;
             const RACK_UNIT_HEIGHT = 44.45;
-            const DEVICE_HEIGHT_PER_U = 35.0;
             
             // Check if wide mode
             const wideMode = isWideDeviceMode(width, tolerance);
+            
+            // Use different DEVICE_HEIGHT_PER_U for wide vs standard mode
+            const DEVICE_HEIGHT_PER_U = wideMode ? 25.0 : 35.0;
             
             // Calculate dimensions
             const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
@@ -1421,17 +1501,27 @@
             const shelfThickness = parseFloat(document.getElementById('shelfThickness').value);
             const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
             const gussetSize = parseFloat(document.getElementById('gussetSize').value);
+            const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
             const addSupport = document.getElementById('addSupport').checked;
             
-            const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, bracketSide);
+            // Generate fresh bracket geometry - it's already in correct local coords (0 to RACK_HALF_WIDTH)
+            const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide);
+            
+            // Update all matrices in the hierarchy
+            bracket.updateMatrixWorld(true);
             
             const exporter = new THREE.STLExporter();
             const exportGroup = new THREE.Group();
             
+            // Clone meshes and bake their transforms into geometry
             bracket.traverse((child) => {
                 if (child.isMesh) {
-                    const clonedMesh = child.clone();
-                    clonedMesh.applyMatrix4(bracket.matrixWorld);
+                    // Clone geometry to avoid modifying original
+                    const clonedGeom = child.geometry.clone();
+                    // Bake the child's world matrix into geometry vertices
+                    clonedGeom.applyMatrix4(child.matrixWorld);
+                    
+                    const clonedMesh = new THREE.Mesh(clonedGeom, child.material);
                     exportGroup.add(clonedMesh);
                 }
             });
@@ -1646,7 +1736,7 @@
         });
 
         // Input listeners for live preview
-        ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'shelfThickness', 'flangeThickness', 'gussetSize', 'infill'].forEach(id => {
+        ['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'shelfThickness', 'flangeThickness', 'gussetSize', 'shelfGussetWidth', 'infill'].forEach(id => {
             document.getElementById(id).addEventListener('input', updatePreview);
         });
 
