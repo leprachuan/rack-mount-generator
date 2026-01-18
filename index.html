@@ -351,6 +351,12 @@
                 <div class="section-title">Rack Ear Configuration</div>
 
                 <div class="form-group">
+                    <label for="minRackUnits">Minimum Rack Units</label>
+                    <input type="number" id="minRackUnits" value="0" min="0" max="10" step="1" required>
+                    <div class="input-label">Force bracket to be at least this many U (0 = auto-calculate from device height)</div>
+                </div>
+
+                <div class="form-group">
                     <label for="earSide">Rack Ear Side</label>
                     <select id="earSide" required>
                         <option value="left" selected>Left Side</option>

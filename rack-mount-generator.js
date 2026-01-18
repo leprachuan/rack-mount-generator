@@ -50,7 +50,7 @@ function isWideDeviceMode(width, tolerance) {
 
 // Generate a single bracket for wide-device mode
 // bracketSide: 'left' or 'right' determines which half we're generating
-function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide) {
+function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits) {
     const group = new THREE.Group();
     
     const RACK_HALF_WIDTH = 225.0;
@@ -63,7 +63,8 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
     const addRackHoles = document.getElementById('addRackHoles').checked;
     
     // Calculate dimensions
-    const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const calculatedRackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const rackUnits = Math.max(calculatedRackUnits, minRackUnits || 0);
     const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
     const faceplateWidth = RACK_HALF_WIDTH;
     const faceplateThickness = wallThickness;
@@ -465,7 +466,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
 
 // Generate Mount Bracket Geometry
 // This creates a preview that matches the STL generator output
-function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth) {
+function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits) {
     const group = new THREE.Group();
     
     // Check if wide device mode is needed
@@ -475,13 +476,13 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
         
         // Left bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
         // Position so it spans -RACK_HALF_WIDTH to 0 in world coords
-        const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'left');
+        const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'left', minRackUnits);
         leftBracket.position.set(-RACK_HALF_WIDTH, 0, 0);
         group.add(leftBracket);
         
         // Right bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
         // Position so it spans 0 to RACK_HALF_WIDTH in world coords
-        const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'right');
+        const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'right', minRackUnits);
         rightBracket.position.set(0, 0, 0);
         group.add(rightBracket);
         
@@ -509,7 +510,8 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
     const isBlank = document.getElementById('isBlank').checked;
     
     // Calculate dimensions
-    const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const calculatedRackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const rackUnits = Math.max(calculatedRackUnits, minRackUnits || 0);
     const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
     const faceplateWidth = RACK_HALF_WIDTH;
     const faceplateThickness = wallThickness; // This is now the plate thickness (default 10mm)
@@ -825,6 +827,7 @@ function updatePreview() {
     const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
     const gussetSize = parseFloat(document.getElementById('gussetSize').value);
     const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
+    const minRackUnits = parseInt(document.getElementById('minRackUnits').value) || 0;
     const addSupport = document.getElementById('addSupport').checked;
 
     // Remove old mesh
@@ -832,7 +835,7 @@ function updatePreview() {
     if (supportMesh) scene.remove(supportMesh);
 
     // Generate geometry (returns a group)
-    mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth);
+    mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits);
     scene.add(mountMesh);
 
     // Remove old device mesh if exists
@@ -845,8 +848,9 @@ function updatePreview() {
     const RACK_UNIT_HEIGHT = 44.45;
     // Use different DEVICE_HEIGHT_PER_U for wide vs standard mode
     const isWide = isWideDeviceMode(width, tolerance);
-    const DEVICE_HEIGHT_PER_U = isWide ? 25.0 : 35.0;
-    const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const DEVICE_HEIGHT_PER_U = isWide ? 30.0 : 35.0;
+    const calculatedRackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const rackUnits = Math.max(calculatedRackUnits, minRackUnits);
     const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
     const openingWidth = width + 2 * tolerance;
     const openingHeight = height + 2 * tolerance;
@@ -883,7 +887,7 @@ function updatePreview() {
     scene.add(deviceMesh);
 
     // Calculate stats
-    calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness);
+    calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness, minRackUnits);
     
     // Update wide mode indicator
     updateWideModeIndicator(width, tolerance);
@@ -899,7 +903,7 @@ function updateWideModeIndicator(width, tolerance) {
     }
 }
 
-function calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness) {
+function calculateStats(width, height, depth, tolerance, wallThickness, shelfThickness, minRackUnits) {
     // Constants
     const RACK_HALF_WIDTH = 225.0;
     const RACK_UNIT_HEIGHT = 44.45;
@@ -908,10 +912,11 @@ function calculateStats(width, height, depth, tolerance, wallThickness, shelfThi
     const wideMode = isWideDeviceMode(width, tolerance);
     
     // Use different DEVICE_HEIGHT_PER_U for wide vs standard mode
-    const DEVICE_HEIGHT_PER_U = wideMode ? 25.0 : 35.0;
+    const DEVICE_HEIGHT_PER_U = wideMode ? 30.0 : 35.0;
     
     // Calculate dimensions
-    const rackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const calculatedRackUnits = Math.ceil(height / DEVICE_HEIGHT_PER_U);
+    const rackUnits = Math.max(calculatedRackUnits, minRackUnits || 0);
     const faceplateHeight = rackUnits * RACK_UNIT_HEIGHT;
     const openingWidth = width + 2 * tolerance;
     const openingHeight = height + 2 * tolerance;
@@ -995,10 +1000,11 @@ function exportBracketSTL(bracketSide) {
     const flangeThickness = parseFloat(document.getElementById('flangeThickness').value);
     const gussetSize = parseFloat(document.getElementById('gussetSize').value);
     const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
+    const minRackUnits = parseInt(document.getElementById('minRackUnits').value) || 0;
     const addSupport = document.getElementById('addSupport').checked;
     
     // Generate fresh bracket geometry - it's already in correct local coords (0 to RACK_HALF_WIDTH)
-    const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide);
+    const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits);
     
     // Update all matrices in the hierarchy
     bracket.updateMatrixWorld(true);
@@ -1203,6 +1209,7 @@ function resetForm() {
     document.getElementById(id).addEventListener('input', updatePreview);
 });
 
+document.getElementById('minRackUnits').addEventListener('change', updatePreview);
 document.getElementById('addSupport').addEventListener('change', updatePreview);
 document.getElementById('earSide').addEventListener('change', updatePreview);
 document.getElementById('addRackHoles').addEventListener('change', updatePreview);
