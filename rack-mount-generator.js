@@ -48,31 +48,44 @@ function isWideDeviceMode(width, tolerance) {
     return openingWidth > 200;
 }
 
-// Helper function to create a rounded rectangle shape
-function createRoundedRectShape(x, y, width, height, radius) {
-    const shape = new THREE.Shape();
+// Helper function to create a rounded rectangle path (for use as a hole)
+function createRoundedRectPath(x, y, width, height, radius) {
+    const path = new THREE.Path();
     
-    if (radius <= 0 || radius > Math.min(width, height) / 2) {
-        // No rounding or invalid radius - create regular rectangle
-        shape.moveTo(x, y);
-        shape.lineTo(x + width, y);
-        shape.lineTo(x + width, y + height);
-        shape.lineTo(x, y + height);
-        shape.lineTo(x, y);
+    // Clamp radius to max half of smallest dimension
+    const maxRadius = Math.min(width, height) / 2;
+    const r = Math.min(radius, maxRadius);
+    
+    if (r <= 0) {
+        // No rounding - create regular rectangle
+        path.moveTo(x, y);
+        path.lineTo(x + width, y);
+        path.lineTo(x + width, y + height);
+        path.lineTo(x, y + height);
+        path.lineTo(x, y);
     } else {
-        // Create rounded rectangle
-        shape.moveTo(x + radius, y);
-        shape.lineTo(x + width - radius, y);
-        shape.absarc(x + width - radius, y + radius, radius, -Math.PI / 2, 0, false);
-        shape.lineTo(x + width, y + height - radius);
-        shape.absarc(x + width - radius, y + height - radius, radius, 0, Math.PI / 2, false);
-        shape.lineTo(x + radius, y + height);
-        shape.absarc(x + radius, y + height - radius, radius, Math.PI / 2, Math.PI, false);
-        shape.lineTo(x, y + radius);
-        shape.absarc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5, false);
+        // Create rounded rectangle path
+        // Start from bottom-left after the corner radius
+        path.moveTo(x + r, y);
+        // Bottom edge
+        path.lineTo(x + width - r, y);
+        // Bottom-right corner
+        path.absarc(x + width - r, y + r, r, -Math.PI / 2, 0, false);
+        // Right edge
+        path.lineTo(x + width, y + height - r);
+        // Top-right corner
+        path.absarc(x + width - r, y + height - r, r, 0, Math.PI / 2, false);
+        // Top edge
+        path.lineTo(x + r, y + height);
+        // Top-left corner
+        path.absarc(x + r, y + height - r, r, Math.PI / 2, Math.PI, false);
+        // Left edge
+        path.lineTo(x, y + r);
+        // Bottom-left corner
+        path.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
     }
     
-    return shape;
+    return path;
 }
 
 // Generate a single bracket for wide-device mode
@@ -140,7 +153,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
         faceplateShape.lineTo(0, 0);
         
         // Create rounded rectangle hole for opening
-        const holeShape = createRoundedRectShape(localOpeningStart, openingY, localOpeningWidth, openingHeight, cornerRadius);
+        const holeShape = createRoundedRectPath(localOpeningStart, openingY, localOpeningWidth, openingHeight, cornerRadius);
         faceplateShape.holes.push(holeShape);
         
         const extrudeSettings = {
@@ -595,7 +608,7 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
         faceplateShape.lineTo(0, 0);
         
         // Create rounded rectangle hole for opening
-        const holeShape = createRoundedRectShape(openingX, openingY, openingWidth, openingHeight, cornerRadius);
+        const holeShape = createRoundedRectPath(openingX, openingY, openingWidth, openingHeight, cornerRadius);
         faceplateShape.holes.push(holeShape);
         
         const extrudeSettings = {
