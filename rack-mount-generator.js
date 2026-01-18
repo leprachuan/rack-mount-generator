@@ -48,9 +48,36 @@ function isWideDeviceMode(width, tolerance) {
     return openingWidth > 200;
 }
 
+// Helper function to create a rounded rectangle shape
+function createRoundedRectShape(x, y, width, height, radius) {
+    const shape = new THREE.Shape();
+    
+    if (radius <= 0 || radius > Math.min(width, height) / 2) {
+        // No rounding or invalid radius - create regular rectangle
+        shape.moveTo(x, y);
+        shape.lineTo(x + width, y);
+        shape.lineTo(x + width, y + height);
+        shape.lineTo(x, y + height);
+        shape.lineTo(x, y);
+    } else {
+        // Create rounded rectangle
+        shape.moveTo(x + radius, y);
+        shape.lineTo(x + width - radius, y);
+        shape.absarc(x + width - radius, y + radius, radius, -Math.PI / 2, 0, false);
+        shape.lineTo(x + width, y + height - radius);
+        shape.absarc(x + width - radius, y + height - radius, radius, 0, Math.PI / 2, false);
+        shape.lineTo(x + radius, y + height);
+        shape.absarc(x + radius, y + height - radius, radius, Math.PI / 2, Math.PI, false);
+        shape.lineTo(x, y + radius);
+        shape.absarc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5, false);
+    }
+    
+    return shape;
+}
+
 // Generate a single bracket for wide-device mode
 // bracketSide: 'left' or 'right' determines which half we're generating
-function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits) {
+function generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits, cornerRadius) {
     const group = new THREE.Group();
     
     const RACK_HALF_WIDTH = 225.0;
@@ -103,8 +130,31 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
         const blankMesh = new THREE.Mesh(blankGeom, bracketMat);
         blankMesh.position.set(faceplateWidth/2, faceplateHeight/2, -faceplateThickness/2);
         group.add(blankMesh);
+    } else if (localOpeningWidth > 0 && cornerRadius > 0) {
+        // Create faceplate with rounded corner opening using ExtrudeGeometry
+        const faceplateShape = new THREE.Shape();
+        faceplateShape.moveTo(0, 0);
+        faceplateShape.lineTo(faceplateWidth, 0);
+        faceplateShape.lineTo(faceplateWidth, faceplateHeight);
+        faceplateShape.lineTo(0, faceplateHeight);
+        faceplateShape.lineTo(0, 0);
+        
+        // Create rounded rectangle hole for opening
+        const holeShape = createRoundedRectShape(localOpeningStart, openingY, localOpeningWidth, openingHeight, cornerRadius);
+        faceplateShape.holes.push(holeShape);
+        
+        const extrudeSettings = {
+            steps: 1,
+            depth: faceplateThickness,
+            bevelEnabled: false
+        };
+        
+        const faceplateGeom = new THREE.ExtrudeGeometry(faceplateShape, extrudeSettings);
+        const faceplateMesh = new THREE.Mesh(faceplateGeom, bracketMat);
+        faceplateMesh.position.set(0, 0, -faceplateThickness);
+        group.add(faceplateMesh);
     } else {
-        // Create faceplate with partial opening
+        // Create faceplate with rectangular opening (original method)
         
         // Bottom section (below opening)
         if (openingY > 0) {
@@ -466,7 +516,7 @@ function generateWideBracket(width, height, depth, tolerance, wallThickness, add
 
 // Generate Mount Bracket Geometry
 // This creates a preview that matches the STL generator output
-function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits) {
+function generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits, cornerRadius) {
     const group = new THREE.Group();
     
     // Check if wide device mode is needed
@@ -476,13 +526,13 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
         
         // Left bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
         // Position so it spans -RACK_HALF_WIDTH to 0 in world coords
-        const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'left', minRackUnits);
+        const leftBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'left', minRackUnits, cornerRadius);
         leftBracket.position.set(-RACK_HALF_WIDTH, 0, 0);
         group.add(leftBracket);
         
         // Right bracket - geometry goes from 0 to RACK_HALF_WIDTH internally
         // Position so it spans 0 to RACK_HALF_WIDTH in world coords
-        const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'right', minRackUnits);
+        const rightBracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, 'right', minRackUnits, cornerRadius);
         rightBracket.position.set(0, 0, 0);
         group.add(rightBracket);
         
@@ -535,9 +585,31 @@ function generateMountGeometry(width, height, depth, tolerance, wallThickness, a
         const blankMesh = new THREE.Mesh(blankGeom, bracketMat);
         blankMesh.position.set(faceplateWidth/2, faceplateHeight/2, -faceplateThickness/2);
         group.add(blankMesh);
+    } else if (cornerRadius > 0) {
+        // Create faceplate with rounded corner opening using ExtrudeGeometry
+        const faceplateShape = new THREE.Shape();
+        faceplateShape.moveTo(0, 0);
+        faceplateShape.lineTo(faceplateWidth, 0);
+        faceplateShape.lineTo(faceplateWidth, faceplateHeight);
+        faceplateShape.lineTo(0, faceplateHeight);
+        faceplateShape.lineTo(0, 0);
+        
+        // Create rounded rectangle hole for opening
+        const holeShape = createRoundedRectShape(openingX, openingY, openingWidth, openingHeight, cornerRadius);
+        faceplateShape.holes.push(holeShape);
+        
+        const extrudeSettings = {
+            steps: 1,
+            depth: faceplateThickness,
+            bevelEnabled: false
+        };
+        
+        const faceplateGeom = new THREE.ExtrudeGeometry(faceplateShape, extrudeSettings);
+        const faceplateMesh = new THREE.Mesh(faceplateGeom, bracketMat);
+        faceplateMesh.position.set(0, 0, -faceplateThickness);
+        group.add(faceplateMesh);
     } else {
-        // Create faceplate with hole using CSG-like approach with BoxGeometry pieces
-        // Since Three.js doesn't have native CSG, we'll build it from pieces
+        // Create faceplate with rectangular hole using BoxGeometry pieces
         
         // Bottom section (below opening)
         if (openingY > 0) {
@@ -828,6 +900,7 @@ function updatePreview() {
     const gussetSize = parseFloat(document.getElementById('gussetSize').value);
     const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
     const minRackUnits = parseInt(document.getElementById('minRackUnits').value) || 0;
+    const cornerRadius = parseFloat(document.getElementById('cornerRadius').value) || 0;
     const addSupport = document.getElementById('addSupport').checked;
 
     // Remove old mesh
@@ -835,7 +908,7 @@ function updatePreview() {
     if (supportMesh) scene.remove(supportMesh);
 
     // Generate geometry (returns a group)
-    mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits);
+    mountMesh = generateMountGeometry(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, minRackUnits, cornerRadius);
     scene.add(mountMesh);
 
     // Remove old device mesh if exists
@@ -1001,10 +1074,11 @@ function exportBracketSTL(bracketSide) {
     const gussetSize = parseFloat(document.getElementById('gussetSize').value);
     const shelfGussetWidth = parseFloat(document.getElementById('shelfGussetWidth').value);
     const minRackUnits = parseInt(document.getElementById('minRackUnits').value) || 0;
+    const cornerRadius = parseFloat(document.getElementById('cornerRadius').value) || 0;
     const addSupport = document.getElementById('addSupport').checked;
     
     // Generate fresh bracket geometry - it's already in correct local coords (0 to RACK_HALF_WIDTH)
-    const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits);
+    const bracket = generateWideBracket(width, height, depth, tolerance, wallThickness, addSupport, shelfThickness, flangeThickness, gussetSize, shelfGussetWidth, bracketSide, minRackUnits, cornerRadius);
     
     // Update all matrices in the hierarchy
     bracket.updateMatrixWorld(true);
@@ -1205,7 +1279,7 @@ function resetForm() {
 }
 
 // Input listeners for live preview
-['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'shelfThickness', 'flangeThickness', 'gussetSize', 'shelfGussetWidth', 'infill'].forEach(id => {
+['deviceWidth', 'deviceHeight', 'deviceDepth', 'tolerance', 'wallThickness', 'cornerRadius', 'shelfThickness', 'flangeThickness', 'gussetSize', 'shelfGussetWidth', 'infill'].forEach(id => {
     document.getElementById(id).addEventListener('input', updatePreview);
 });
 
